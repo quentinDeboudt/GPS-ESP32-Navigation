@@ -267,25 +267,6 @@ class MainActivity : AppCompatActivity() {
                 val centerX = width / 2f
                 val centerY = height / 2f
                 drawArrow(canvas, centerX, centerY)
-
-
-                //Ajouter des point de couleur (Départ/Arrivée)
-                //val startPoint = projected.first()
-                val endPoint = projected.last()
-
-               /* val startPointPaint = Paint().apply {
-                    color = Color.BLUE
-                    style = Paint.Style.FILL
-                }
-
-                */
-                val finalPointPaint = Paint().apply {
-                    color = Color.RED
-                    style = Paint.Style.FILL
-                }
-
-                //canvas.drawCircle(startPoint.x, startPoint.y, 10f, startPointPaint)
-                canvas.drawCircle(endPoint.x, endPoint.y, 10f, finalPointPaint)
             }
 
             fun drawArrow(canvas: Canvas, centerX: Float, centerY: Float) {
