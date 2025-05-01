@@ -40,7 +40,7 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.Priority
 import com.quentin.navigationapp.model.DirectionsResponse
 import org.osmdroid.util.GeoPoint
-import kotlin.math.min
+import androidx.core.graphics.withRotation
 
 class MainActivity : AppCompatActivity() {
 
@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var currentAdress: List<Address>
     private lateinit var finishAddress: List<Address>
     private var currentLocation: GeoPoint? = null
+    private var currentBearing: Float = 0f
 
 
 
@@ -104,9 +105,11 @@ class MainActivity : AppCompatActivity() {
         val locationCallback = object : LocationCallback() {
             override fun onLocationResult(p0: LocationResult) {
                 val location = p0.lastLocation ?: return
-                updateCurrentLocation(location.latitude, location.longitude)
+                val bearing = location.bearing
+                updateCurrentLocation(location.latitude, location.longitude, bearing)
             }
         }
+
 
         // Vérifie les permissions
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
@@ -229,7 +232,7 @@ class MainActivity : AppCompatActivity() {
             //tracé vectoriel:
             val pathPaint = Paint().apply {
                 color = Color.WHITE
-                strokeWidth = 6f
+                strokeWidth = 12f
                 style = Paint.Style.STROKE
                 isAntiAlias = true
             }
@@ -240,33 +243,14 @@ class MainActivity : AppCompatActivity() {
                 style = Paint.Style.FILL
             }
 
-            //Fleche de navigation:
-            val arrowPaint = Paint().apply {
-                color = Color.RED
-                style = Paint.Style.FILL
-                isAntiAlias = true
-            }
-
             override fun onDraw(canvas: Canvas) {
-
                 super.onDraw(canvas)
                 canvas.drawPaint(bgPaint)
-
-                // Dessiner la flèche si position connue
-                currentLocation?.let { location ->
-                    val projectedPos = projectCoordsToScreen(listOf(location), width, height).firstOrNull()
-                    projectedPos?.let {
-                        drawArrow(canvas, it, arrowPaint)
-                    }
-                }
-
-                val arrowX = width / 2f
-                val arrowY = height / 2f
-                canvas.drawCircle(arrowX, arrowY, 20f, arrowPaint)
 
                 if (coords.size < 2) return
 
                 val projected = projectCoordsToScreen(coords, width, height)
+
                 val path = Path().apply {
                     moveTo(projected[0].x, projected[0].y)
                     for (i in 1 until projected.size) {
@@ -274,33 +258,68 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                canvas.drawPath(path, pathPaint)
+                // On fait tourner la carte (et donc le tracé)
+                canvas.withRotation(-currentBearing, width / 2f, height / 2f) {
+                    drawPath(path, pathPaint)
+                }
 
-                val startPoint = projected.first()
+                // Dessiner la flèche au centre de l'écran
+                val centerX = width / 2f
+                val centerY = height / 2f
+                drawArrow(canvas, centerX, centerY)
+
+
+                //Ajouter des point de couleur (Départ/Arrivée)
+                //val startPoint = projected.first()
                 val endPoint = projected.last()
 
-                val startPointPaint = Paint().apply {
+               /* val startPointPaint = Paint().apply {
                     color = Color.BLUE
                     style = Paint.Style.FILL
                 }
+
+                */
                 val finalPointPaint = Paint().apply {
                     color = Color.RED
                     style = Paint.Style.FILL
                 }
 
-                canvas.drawCircle(startPoint.x, startPoint.y, 10f, startPointPaint)
+                //canvas.drawCircle(startPoint.x, startPoint.y, 10f, startPointPaint)
                 canvas.drawCircle(endPoint.x, endPoint.y, 10f, finalPointPaint)
             }
 
-            fun drawArrow(canvas: Canvas, pos: PointF, paint: Paint) {
-                val size = 20f
-                val path = Path().apply {
-                    moveTo(pos.x, pos.y - size)         // pointe
-                    lineTo(pos.x - size / 2, pos.y + size / 2) // coin gauche
-                    lineTo(pos.x + size / 2, pos.y + size / 2) // coin droit
-                    close()
+            fun drawArrow(canvas: Canvas, centerX: Float, centerY: Float) {
+                // Créer un Paint pour la flèche (blanche)
+                val arrowPaint = Paint().apply {
+                    color = Color.WHITE
+                    style = Paint.Style.FILL
+                    isAntiAlias = true
                 }
-                canvas.drawPath(path, paint)
+
+                // Créer un Paint pour la bordure noire de la flèche
+                val borderPaint = Paint().apply {
+                    color = Color.BLACK
+                    strokeWidth = 6f  // Largeur de la bordure
+                    style = Paint.Style.STROKE
+                    isAntiAlias = true
+                }
+
+                // Créer un Path pour la flèche (forme triangulaire)
+                val path = Path()
+                val arrowHeight = 80f  // Longueur de la flèche
+                val arrowWidth = 40f   // Largeur de la flèche
+
+                // Définir la forme triangulaire de la flèche (pointe vers le haut)
+                path.moveTo(centerX, centerY - arrowHeight)  // Point de départ (haut de la flèche)
+                path.lineTo(centerX - arrowWidth, centerY)   // Bas gauche
+                path.lineTo(centerX + arrowWidth, centerY)   // Bas droite
+                path.close()  // Fermer le triangle
+
+                // Dessiner la flèche (blanche)
+                canvas.drawPath(path, arrowPaint)
+
+                // Dessiner la bordure noire
+                canvas.drawPath(path, borderPaint)
             }
 
             fun projectCoordsToScreen(
@@ -310,7 +329,7 @@ class MainActivity : AppCompatActivity() {
             ): List<PointF> {
                 val centerLat = currentLocation?.latitude ?: geoPoints.map { it.latitude }.average()
                 val centerLon = currentLocation?.longitude ?: geoPoints.map { it.longitude }.average()
-                val scale = 100000.0
+                val scale = 400000.0 // Zoom x4
                 val centerX = width / 2f
                 val centerY = height / 2f
 
@@ -327,10 +346,13 @@ class MainActivity : AppCompatActivity() {
         mapContainer.addView(customMapView)
     }
 
-    fun updateCurrentLocation(lat: Double, lon: Double) {
-        currentLocation = GeoPoint(lat, lon)
+    fun updateCurrentLocation(lat: Double, lon: Double, bearing: Float) {
+        this.currentLocation = GeoPoint(lat, lon)
+        this.currentBearing = bearing
+
         val mapContainer = findViewById<FrameLayout>(R.id.mapContainer)
         val customView = mapContainer.getChildAt(0)
+
         customView?.invalidate() // redessine la vue
     }
 
