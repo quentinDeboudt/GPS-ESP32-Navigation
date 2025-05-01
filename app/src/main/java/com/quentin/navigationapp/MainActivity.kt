@@ -232,7 +232,7 @@ class MainActivity : AppCompatActivity() {
             //tracé vectoriel:
             val pathPaint = Paint().apply {
                 color = Color.WHITE
-                strokeWidth = 12f
+                strokeWidth = 15f
                 style = Paint.Style.STROKE
                 isAntiAlias = true
             }
@@ -310,7 +310,7 @@ class MainActivity : AppCompatActivity() {
             ): List<PointF> {
                 val centerLat = currentLocation?.latitude ?: geoPoints.map { it.latitude }.average()
                 val centerLon = currentLocation?.longitude ?: geoPoints.map { it.longitude }.average()
-                val scale = 400000.0 // Zoom x4
+                val scale = 100000.0 // Zoom x4
                 val centerX = width / 2f
                 val centerY = height / 2f
 
