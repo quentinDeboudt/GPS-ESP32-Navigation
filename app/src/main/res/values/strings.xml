@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">NavigationApp</string>
+    <string name="steps_list_description">Liste des étapes de navigation</string>
+</resources>
