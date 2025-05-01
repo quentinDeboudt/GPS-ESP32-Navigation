@@ -1,6 +1,7 @@
 package com.quentin.navigationapp
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.os.Bundle
@@ -28,18 +29,18 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.quentin.navigationapp.ui.theme.StepAdapter
 
-//Mini map Visuel
-import org.osmdroid.config.Configuration
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.views.MapView
-import org.osmdroid.util.BoundingBox
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.Polyline
-import android.graphics.Color
-import android.preference.PreferenceManager
+//Mini map
+import android.graphics.*
+import android.os.Looper
+import android.view.View
+import android.widget.FrameLayout
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.Priority
 import com.quentin.navigationapp.model.DirectionsResponse
-
+import org.osmdroid.util.GeoPoint
+import kotlin.math.min
 
 class MainActivity : AppCompatActivity() {
 
@@ -49,6 +50,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var currentLatLng: LatLng
     private lateinit var currentAdress: List<Address>
     private lateinit var finishAddress: List<Address>
+    private var currentLocation: GeoPoint? = null
+
+
 
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,16 +60,14 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Instruction des chaque direction
+        // Instruction direction
         val rvSteps = findViewById<RecyclerView>(R.id.rvSteps)
         rvSteps.layoutManager = LinearLayoutManager(this)
 
-        //Integration de la mini map visuel
-        Configuration.getInstance()
-            .load(applicationContext, PreferenceManager.getDefaultSharedPreferences(applicationContext))
 
         // Initialise fusedLocationClient en tout premier
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        startLocationUpdates()
 
         getCurrentLocation()
 
@@ -91,6 +93,35 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @SuppressLint("MissingPermission") // Géré plus bas
+    fun startLocationUpdates() {
+        val locationRequest = LocationRequest.create().apply {
+            interval = 1000            // 1 seconde
+            fastestInterval = 500
+            priority = Priority.PRIORITY_HIGH_ACCURACY
+        }
+
+        val locationCallback = object : LocationCallback() {
+            override fun onLocationResult(p0: LocationResult) {
+                val location = p0.lastLocation ?: return
+                updateCurrentLocation(location.latitude, location.longitude)
+            }
+        }
+
+        // Vérifie les permissions
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+        } else {
+            // Sinon, demander la permission à l'utilisateur
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                1001
+            )
+        }
+    }
+
+
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     private fun getCurrentLocation() {
         val tvPosition = findViewById<TextView>(R.id.et_current_position)
@@ -111,7 +142,7 @@ class MainActivity : AppCompatActivity() {
                     val currentPosition = currentAdress[0].getAddressLine(0)
 
                     // Mets à jour les textes
-                    tvPosition.text = "🚩 $currentPosition"
+                    tvPosition.text = "🛰️ $currentPosition"
                 }
 
             } else {
@@ -127,7 +158,7 @@ class MainActivity : AppCompatActivity() {
             // Effectuer la géocodification
             finishAddress = geocoder.getFromLocationName(address, 1)!!
 
-            if (finishAddress != null && finishAddress.isNotEmpty()) {
+            if (finishAddress.isNotEmpty()) {
                 val location = finishAddress[0]
                 val destinationLatLng = LatLng(location.latitude, location.longitude)
 
@@ -186,48 +217,121 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * displayMap - Display map with bleue navigation
+     * displayMap - Deplay map with path navigation.
      */
-    private fun displayMap(response: DirectionsResponse){
-
-        val mapView: MapView = findViewById(R.id.mapView)
-        mapView.setTileSource(TileSourceFactory.MAPNIK)
-        mapView.setMultiTouchControls(true)
-        mapView.controller.setZoom(12.0)
-
-        val coords = response.features
+    private fun displayMap(response: DirectionsResponse) {
+        val coords: List<GeoPoint> = response.features
             .firstOrNull()?.geometry?.coordinates
             ?.map { GeoPoint(it[1], it[0]) } ?: emptyList()
 
-        mapView.controller.setCenter(coords.first())
+        val customMapView = object : View(this) {
 
-        if (coords.isNotEmpty()) {
-            // tracer la ligne
-            val polyline = Polyline().apply {
-                setPoints(coords)
-                outlinePaint.color = Color.BLUE
-                outlinePaint.strokeWidth = 8f
+            //tracé vectoriel:
+            val pathPaint = Paint().apply {
+                color = Color.WHITE
+                strokeWidth = 6f
+                style = Paint.Style.STROKE
+                isAntiAlias = true
             }
-            mapView.overlays.add(polyline)
 
-            // marker départ
-            Marker(mapView).apply {
-                position = coords.first()
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                title = "$currentAdress"
-            }.also { mapView.overlays.add(it) }
+            //Arriere plan du GPS
+            val bgPaint = Paint().apply {
+                color = Color.BLACK
+                style = Paint.Style.FILL
+            }
 
-            // marker arrivée
-            Marker(mapView).apply {
-                position = coords.last()
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                title = "$finishAddress"
-            }.also { mapView.overlays.add(it) }
+            //Fleche de navigation:
+            val arrowPaint = Paint().apply {
+                color = Color.RED
+                style = Paint.Style.FILL
+                isAntiAlias = true
+            }
 
-            // ajuster vue
-            val bb = BoundingBox.fromGeoPoints(coords)
-            mapView.zoomToBoundingBox(bb, true)
+            override fun onDraw(canvas: Canvas) {
+
+                super.onDraw(canvas)
+                canvas.drawPaint(bgPaint)
+
+                // Dessiner la flèche si position connue
+                currentLocation?.let { location ->
+                    val projectedPos = projectCoordsToScreen(listOf(location), width, height).firstOrNull()
+                    projectedPos?.let {
+                        drawArrow(canvas, it, arrowPaint)
+                    }
+                }
+
+                val arrowX = width / 2f
+                val arrowY = height / 2f
+                canvas.drawCircle(arrowX, arrowY, 20f, arrowPaint)
+
+                if (coords.size < 2) return
+
+                val projected = projectCoordsToScreen(coords, width, height)
+                val path = Path().apply {
+                    moveTo(projected[0].x, projected[0].y)
+                    for (i in 1 until projected.size) {
+                        lineTo(projected[i].x, projected[i].y)
+                    }
+                }
+
+                canvas.drawPath(path, pathPaint)
+
+                val startPoint = projected.first()
+                val endPoint = projected.last()
+
+                val startPointPaint = Paint().apply {
+                    color = Color.BLUE
+                    style = Paint.Style.FILL
+                }
+                val finalPointPaint = Paint().apply {
+                    color = Color.RED
+                    style = Paint.Style.FILL
+                }
+
+                canvas.drawCircle(startPoint.x, startPoint.y, 10f, startPointPaint)
+                canvas.drawCircle(endPoint.x, endPoint.y, 10f, finalPointPaint)
+            }
+
+            fun drawArrow(canvas: Canvas, pos: PointF, paint: Paint) {
+                val size = 20f
+                val path = Path().apply {
+                    moveTo(pos.x, pos.y - size)         // pointe
+                    lineTo(pos.x - size / 2, pos.y + size / 2) // coin gauche
+                    lineTo(pos.x + size / 2, pos.y + size / 2) // coin droit
+                    close()
+                }
+                canvas.drawPath(path, paint)
+            }
+
+            fun projectCoordsToScreen(
+                geoPoints: List<GeoPoint>,
+                width: Int,
+                height: Int
+            ): List<PointF> {
+                val centerLat = currentLocation?.latitude ?: geoPoints.map { it.latitude }.average()
+                val centerLon = currentLocation?.longitude ?: geoPoints.map { it.longitude }.average()
+                val scale = 100000.0
+                val centerX = width / 2f
+                val centerY = height / 2f
+
+                return geoPoints.map {
+                    val dx = (it.longitude - centerLon) * scale
+                    val dy = (it.latitude - centerLat) * -scale
+                    PointF(centerX + dx.toFloat(), centerY + dy.toFloat())
+                }
+            }
         }
+
+        val mapContainer = findViewById<FrameLayout>(R.id.mapContainer)
+        mapContainer.removeAllViews() // supprime les anciennes vues
+        mapContainer.addView(customMapView)
+    }
+
+    fun updateCurrentLocation(lat: Double, lon: Double) {
+        currentLocation = GeoPoint(lat, lon)
+        val mapContainer = findViewById<FrameLayout>(R.id.mapContainer)
+        val customView = mapContainer.getChildAt(0)
+        customView?.invalidate() // redessine la vue
     }
 
     private fun displayAddress(destinationLatLng: LatLng) {
@@ -248,3 +352,4 @@ class MainActivity : AppCompatActivity() {
         }
     }
 }
+

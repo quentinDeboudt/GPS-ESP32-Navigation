@@ -17,7 +17,7 @@
             android:id="@+id/et_current_position"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="🚩Position actuelle"
+            android:hint="🛰️Position actuelle"
             android:inputType="text"
             android:padding="16dp" />
 
@@ -38,7 +38,7 @@
         android:id="@+id/btnStartNavigation"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Démarrer la navigation"
+        android:text="🗺️ Démarrer la navigation"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/layout_input" />
@@ -46,6 +46,7 @@
     <!-- res/layout/activity_main.xml -->
 
     <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/constraintLayout"
         android:layout_width="381dp"
         android:layout_height="172dp"
         android:text="Instruction de navigation"
@@ -70,6 +71,7 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!--
     <org.osmdroid.views.MapView
         android:id="@+id/mapView"
         android:layout_width="387dp"
@@ -77,5 +79,16 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
+        -->
+
+    <FrameLayout
+        android:id="@+id/mapContainer"
+        android:layout_width="356dp"
+        android:layout_height="279dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/constraintLayout" />
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -92,7 +92,6 @@ dependencies {
     implementation ("androidx.recyclerview:recyclerview:1.2.1")
 
     //pour l'intégration d'une map visuel:
-    implementation ("org.osmdroid:osmdroid-android:6.1.11")
-
+    implementation ("org.osmdroid:osmdroid-android:6.1.16")
 
 }
