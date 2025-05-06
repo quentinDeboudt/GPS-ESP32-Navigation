@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">NavigationApp</string>
     <string name="steps_list_description">Liste des étapes de navigation</string>
+    <string name="lancer_la_navigation">Lancer la navigation</string>
+    <string name="instruction">Instruction</string>
+    <string name="image">image</string>
 </resources>

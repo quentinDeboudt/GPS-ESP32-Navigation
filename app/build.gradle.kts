@@ -1,3 +1,4 @@
+import com.android.build.api.dsl.Packaging
 import java.util.Properties
 
 // Lire la clé API depuis local.properties
@@ -17,6 +18,9 @@ android {
     compileSdk = 35
 
     defaultConfig {
+        vectorDrawables {
+            useSupportLibrary = true
+        }
         applicationId = "com.quentin.navigationapp"
         minSdk = 21
         targetSdk = 35
@@ -38,6 +42,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+    }
+    packaging {
+        resources {
+            pickFirsts.add("META-INF/gradle/incremental.annotation.processors")
         }
     }
     compileOptions {
@@ -93,5 +102,12 @@ dependencies {
 
     //pour l'intégration d'une map visuel:
     implementation ("org.osmdroid:osmdroid-android:6.1.16")
+
+    implementation ("com.google.dagger:hilt-android:2.44")
+    implementation ("com.google.dagger:hilt-android-compiler:2.44")
+
+    // Pour l’injection dans les ViewModels
+    implementation ("androidx.hilt:hilt-lifecycle-viewmodel:1.0.0-alpha03")
+    implementation ("androidx.hilt:hilt-compiler:1.0.0")
 
 }
