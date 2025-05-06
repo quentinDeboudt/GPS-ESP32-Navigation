@@ -4,4 +4,5 @@
     <string name="lancer_la_navigation">Lancer la navigation</string>
     <string name="instruction">Instruction</string>
     <string name="image">image</string>
+    <string name="arreter_la_navigation">Arreter la navigation</string>
 </resources>

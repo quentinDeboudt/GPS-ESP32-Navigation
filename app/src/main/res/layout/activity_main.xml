@@ -13,7 +13,7 @@
 
         <EditText
             android:id="@+id/etDestination"
-            android:layout_width="348dp"
+            android:layout_width="288dp"
             android:layout_height="wrap_content"
             android:hint="📍Destination"
             android:inputType="text"
@@ -24,9 +24,9 @@
 
         <Button
             android:id="@+id/searchNavigationButton"
-            android:layout_width="50dp"
-            android:layout_height="wrap_content"
-            android:text="Go"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:text="Search"
             map:layout_constraintEnd_toEndOf="parent"
             map:layout_constraintStart_toStartOf="parent"
             map:layout_constraintTop_toBottomOf="@+id/layout_input" />
@@ -43,16 +43,19 @@
     <!-- ImageView pour la flèche -->
     <ImageView
         android:id="@+id/arrowImageView"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
         android:layout_marginTop="55dp"
-        android:layout_marginStart="5dp"
+        android:layout_marginStart="10dp"
         android:contentDescription="@string/image" />
+
     <TextView
         android:id="@+id/tvInstruction"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="55dp"
+        android:layout_marginTop="55dp"
+        android:layout_marginStart="75dp"
+        android:layout_marginEnd="20dp"
         android:text="@string/instruction"
         android:textSize="18sp"
         android:padding="16dp"
@@ -60,7 +63,7 @@
         android:textColor="#000000"
         android:gravity="center" />
 
-    <!-- 2. Bouton pour lancer la navigation -->
+    <!-- Bouton pour lancer la navigation -->
     <Button
         android:id="@+id/btnStartNavigation"
         android:layout_width="wrap_content"
@@ -68,82 +71,20 @@
         android:text="@string/lancer_la_navigation"
         android:layout_gravity="bottom|center_horizontal"
         android:layout_marginBottom="50dp"
-        android:backgroundTint="@color/purple_500"
+        android:backgroundTint="@color/black"
+        android:textColor="@android:color/white"
+        android:elevation="6dp" />
+
+    <!-- 2. Bouton pour lancer la navigation -->
+    <Button
+        android:id="@+id/btnFinishNavigation"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/arreter_la_navigation"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="50dp"
+        android:backgroundTint="@color/black"
         android:textColor="@android:color/white"
         android:elevation="6dp" />
 
 </FrameLayout>
-
-
-    <!--
-    <?xml version="1.0" encoding="utf-8"?>
-    <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:app="http://schemas.android.com/apk/res-auto"
-        xmlns:tools="http://schemas.android.com/tools"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        tools:context=".MainActivity">
-
-        <LinearLayout
-            android:id="@+id/layout_input"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            app:layout_constraintTop_toTopOf="parent">
-
-            <EditText
-                android:id="@+id/etDestination"
-                android:layout_width="348dp"
-                android:layout_height="wrap_content"
-                android:hint="📍Destination"
-                android:inputType="text"
-                android:padding="16dp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent" />
-
-            <Button
-                android:id="@+id/btnStartNavigation"
-                android:layout_width="50dp"
-                android:layout_height="wrap_content"
-                android:text="Go"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/layout_input" />
-        </LinearLayout>
-
-        <org.osmdroid.views.MapView
-            android:id="@+id/map"
-            android:layout_width="402dp"
-            android:layout_height="239dp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/layout_input" />
-
-
-        <androidx.constraintlayout.widget.ConstraintLayout
-            android:id="@+id/constraintLayout"
-            android:layout_width="389dp"
-            android:layout_height="79dp"
-            android:text="Instruction de navigation"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintHorizontal_bias="0.727"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/map"
-            tools:context=".MainActivity">
-
-
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvSteps"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:contentDescription="@string/steps_list_description"
-                android:padding="8dp"
-                tools:layout_editor_absoluteX="-16dp"
-                tools:layout_editor_absoluteY="16dp" />
-
-        </androidx.constraintlayout.widget.ConstraintLayout>
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
-    -->
