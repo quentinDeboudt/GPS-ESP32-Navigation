@@ -20,6 +20,6 @@ L'interface sera volontairement **compacte, claire et non intrusive**, pensée p
 
 Pour mieux comprendre l’architecture et les choix métiers, consultez les fichiers suivants :
 
-- [Roadmap de recherche (pistes & orientations)](docs/research_roadmap.md)
-- [Solutions existantes comparées](docs/existing_solutions.md)
-- [Solutions envisagées (comparatif)](docs/proposed_solutions.md) 
+- [Roadmap de recherche (pistes & orientations)](documentation/01_research_roadmap.md)
+- [Solutions existantes comparées](documentation/02_existing_solutions.md)
+- [Solutions envisagées (comparatif)](documentation/03_proposed_solutions.md) 
