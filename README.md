@@ -14,3 +14,12 @@ Les informations affichées incluront :
 - L’heure d’arrivée estimée.
 
 L'interface sera volontairement **compacte, claire et non intrusive**, pensée pour une lecture rapide pendant la conduite.
+
+
+## Documentation
+
+Pour mieux comprendre l’architecture et les choix métiers, consultez les fichiers suivants :
+
+- [Roadmap de recherche (pistes & orientations)](docs/research_roadmap.md)
+- [Solutions existantes comparées](docs/existing_solutions.md)
+- [Solutions envisagées (comparatif)](docs/proposed_solutions.md) 
