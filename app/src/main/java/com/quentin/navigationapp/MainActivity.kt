@@ -44,13 +44,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.withContext
 import org.osmdroid.views.overlay.Polyline
 import kotlin.collections.first
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.drawable.BitmapDrawable
-import kotlin.math.cos
-import kotlin.math.sin
-import android.graphics.Path
 
 class MainActivity : AppCompatActivity() {
 
@@ -163,7 +156,7 @@ class MainActivity : AppCompatActivity() {
         arrowImageView = findViewById(R.id.arrowImageView)
         val btnStartNavigation = findViewById<Button>(R.id.btnStartNavigation)
         val btnFinishNavigation = findViewById<Button>(R.id.btnFinishNavigation)
-
+        val tvDestination = findViewById<TextView>(R.id.etDestination)
 
         // Masquer les bouton
         btnStartNavigation.visibility = View.GONE
@@ -220,21 +213,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Arret de la navigation au clic
-        requestPermissionsIfNeeded {
-            findViewById<Button>(R.id.btnFinishNavigation).setOnClickListener {
-                lifecycleScope.launch {
-                    lifecycleScope.launch {
-                        locationFlow.collect {
-                            updateArrowOverlay(it)
+        findViewById<Button>(R.id.btnFinishNavigation).setOnClickListener {
 
-                            // afficher l'instruction
-                            tvInstruction.visibility = View.VISIBLE
-                            // Supprimer bouton "demarrer la navigation"
-                            btnStartNavigation.visibility = View.GONE
-                        }
-                    }
-                }
-            }
+                // Supprimer l'instruction
+                tvInstruction.visibility = View.GONE
+                // Afficher bouton "demarrer la navigation"
+                btnStartNavigation.visibility = View.VISIBLE
+                // Supprimer bouton "Arreter la navigation"
+                btnFinishNavigation.visibility = View.GONE
+
+                routePoints = emptyList()
+                instructions = emptyList()
+                tvDestination.text = ""
+
         }
     }
 
@@ -287,7 +278,7 @@ class MainActivity : AppCompatActivity() {
 
                 // Itération sur les features
                 for (feature in features) {
-                    val segments = feature.properties?.segments
+                    val segments = feature.properties.segments
 
                     segments?.forEach { segment ->
                         val steps = segment.steps // Récupère les étapes
@@ -314,24 +305,24 @@ class MainActivity : AppCompatActivity() {
 
                                 val bearing = calculateBearing(startGeoPoint, endGeoPoint)
 
-                                if(exitNumber != null){
-                                   // Ajouter l'instruction et la coordonnée à la liste
-                                   instructionsList.add(
-                                       NavigationInstruction(
-                                           instruction,
-                                           startGeoPoint,
-                                           getRoundaboutIconFromBearing(bearing)
-                                       )
-                                   )
-                                   instructionsList.add(
-                                       NavigationInstruction(
-                                           instruction,
-                                           endGeoPoint,
-                                           getRoundaboutIconFromBearing(bearing)
-                                       )
-                                   )
-                                }else {
-                                   Log.d("GPS", "Pas de RondPoint: $instruction")
+                                if (exitNumber != null) {
+                                    // Ajouter l'instruction et la coordonnée à la liste
+                                    instructionsList.add(
+                                        NavigationInstruction(
+                                            instruction,
+                                            startGeoPoint,
+                                            getRoundaboutIconFromBearing(bearing)
+                                        )
+                                    )
+                                    instructionsList.add(
+                                        NavigationInstruction(
+                                            instruction,
+                                            endGeoPoint,
+                                            getRoundaboutIconFromBearing(bearing)
+                                        )
+                                    )
+                                } else {
+                                    Log.d("GPS", "Pas de RondPoint: $instruction")
                                     instructionsList.add(
                                         NavigationInstruction(
                                             instruction,
@@ -341,9 +332,9 @@ class MainActivity : AppCompatActivity() {
                                     )
                                     instructionsList.add(
                                         NavigationInstruction(
-                                           instruction,
-                                           endGeoPoint,
-                                           getArrowForInstruction(instruction)
+                                            instruction,
+                                            endGeoPoint,
+                                            getArrowForInstruction(instruction)
                                         )
                                     )
                                 }
@@ -358,28 +349,38 @@ class MainActivity : AppCompatActivity() {
 
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity,
+                    Toast.makeText(
+                        this@MainActivity,
                         "Erreur lors de la récupération des directions",
                         Toast.LENGTH_LONG
                     ).show()
                 }
             }
         }
+    }
 
     // Définir des flèches en fonction de l'instruction
     fun getArrowForInstruction(instruction: String): Drawable? {
+        val slightRight = listOf("slight", "right")
+        val slightLeft = listOf("slight", "right")
+
         return when {
+            slightRight.any { keyword -> instruction.contains(keyword, ignoreCase = true) } -> {
+                ContextCompat.getDrawable(this, R.drawable.nav_right_1_bk)
+            }
+            slightLeft.any { keyword -> instruction.contains(keyword, ignoreCase = true) } -> {
+                ContextCompat.getDrawable(this, R.drawable.nav_left_1_bk)
+            }
             instruction.contains("right", ignoreCase = true) -> {
                 ContextCompat.getDrawable(this, R.drawable.nav_right_2_bk)
             }
             instruction.contains("left", ignoreCase = true) -> {
                 ContextCompat.getDrawable(this, R.drawable.nav_left_2_bk)
-
             }
             instruction.contains("straight", ignoreCase = true) -> {
-                ContextCompat.getDrawable(this, R.drawable.ic_navigation_arrow)
-
+                ContextCompat.getDrawable(this, R.drawable.nav_straight_bk)
             }
+
             else -> null // Pas de flèche si l'instruction est autre
         }
     }
@@ -405,10 +406,11 @@ class MainActivity : AppCompatActivity() {
             degreeBearing += 360
         }
 
-        return -degreeBearing.toFloat()
+        return degreeBearing.toFloat()
     }
 
     fun getRoundaboutIconFromBearing(bearing: Float): Drawable? {
+        Log.d("GPS", "Le dregres du rond point est: $bearing")
 
         return when (bearing) {
             in 337.5..360.0, in 0.0..22.4 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r1_bk)// N
@@ -422,13 +424,6 @@ class MainActivity : AppCompatActivity() {
             else -> null
         }
     }
-
-
-
-
-
-
-
 
     private fun displayMap(response: DirectionsResponse) {
 
@@ -462,8 +457,8 @@ class MainActivity : AppCompatActivity() {
 
         // Crée la flèche
         arrowMarker = Marker(mapView).apply {
-            icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_arrow) //ic_arrow
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_arrow)
+            setAnchor(Marker.ANCHOR_TOP, Marker.ANCHOR_TOP)
         }
 
         // Ajoute la flèche à la carte
@@ -511,6 +506,7 @@ class MainActivity : AppCompatActivity() {
 
 
     var currentInstructionIndex = 0
+    private var instructionAffichee = false
 
     private fun checkInstructionTrigger(currentLocation: GeoPoint) {
         if (currentInstructionIndex >= instructions.size) return
@@ -518,10 +514,24 @@ class MainActivity : AppCompatActivity() {
         val nextInstruction = instructions[currentInstructionIndex]
         val distance = currentLocation.distanceToAsDouble(nextInstruction.location)
 
-        if (distance < 200.0) { // dans un rayon de 200m
+        // 🔹 Étape 1 : afficher l’instruction quand on approche (mais une seule fois)
+        if (distance < 100.0 && !instructionAffichee) {
             showInstruction(nextInstruction)
-            currentInstructionIndex++
+            instructionAffichee = true
         }
+
+        //TODO: Ne fonctionne pas parfaitement!
+        /*
+        // 🔹 Étape 2 : quand on s’éloigne, on passe à la suivante et on vide l’affichage
+        if (instructionAffichee && distance > 120.0) {
+            instructionAffichee = false
+            currentInstructionIndex++
+            tvInstruction.text = ""
+
+            // Affiche l’état "neutre" : flèche tout droit
+            arrowImageView.setImageDrawable(getArrowForInstruction("straight"))
+            tvInstruction.text = "Continuez tout droit" // ou "Continuez tout droit"
+        }*/
     }
 
     private fun showInstruction(nextInstruction: NavigationInstruction) {
