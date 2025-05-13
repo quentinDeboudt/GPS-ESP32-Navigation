@@ -5,4 +5,7 @@
     <string name="instruction">Instruction</string>
     <string name="image">image</string>
     <string name="arreter_la_navigation">Arreter la navigation</string>
+    <string name="destination">📍Destination</string>
+    <string name="search">Search</string>
+    <string name="select_your_vehicle">Select your vehicle</string>
 </resources>

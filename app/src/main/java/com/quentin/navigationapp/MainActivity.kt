@@ -4,9 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.Drawable
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.location.Geocoder
 import android.os.Bundle
@@ -31,7 +28,6 @@ import android.location.Location
 import android.util.Log
 import android.view.View
 import android.widget.Button
-import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -43,7 +39,14 @@ import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.withContext
 import org.osmdroid.views.overlay.Polyline
-import kotlin.collections.first
+import kotlin.math.atan2
+import android.widget.ArrayAdapter
+import android.view.LayoutInflater
+import android.view.ViewGroup
+import android.widget.AdapterView
+import android.widget.LinearLayout
+import android.widget.Spinner
+
 
 class MainActivity : AppCompatActivity() {
 
@@ -56,6 +59,8 @@ class MainActivity : AppCompatActivity() {
     private var routePoints: List<GeoPoint> = emptyList()
     private lateinit var tvInstruction: TextView
     private lateinit var arrowImageView: ImageView
+    private lateinit var tvDestination: TextView
+    private var arrowIcon: Int = R.drawable.ic_arrow_motorbike
 
     private lateinit var instructions: List<NavigationInstruction>
     private var lastPosition: Location? = null
@@ -93,6 +98,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             try {
+                Log.d("GPS", "Géolocalisation mise à jours..")
                 fusedLocationClient.requestLocationUpdates(req, cb, Looper.getMainLooper())
                 awaitClose { fusedLocationClient.removeLocationUpdates(cb) }
             } catch (e: SecurityException) {
@@ -105,65 +111,36 @@ class MainActivity : AppCompatActivity() {
             .conflate()
     }
 
-    // 2. Flow d’orientation (compas)
-    private val orientationFlow: Flow<Float> by lazy {
-        callbackFlow {
-            val listener = object : SensorEventListener {
-                override fun onSensorChanged(e: SensorEvent) {
-                    if (e.sensor.type == Sensor.TYPE_ORIENTATION) {
-                        trySend(e.values[0])
-                    }
-                }
-                override fun onAccuracyChanged(sensor: Sensor?, acc: Int) {}
-            }
-            sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION)?.also {
-                sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_UI)
-            }
-            awaitClose { sensorManager.unregisterListener(listener) }
-        }
-            .flowOn(ioDispatcher)
-            .conflate()
-    }
-
-    // 3. Flow de bearing vers le prochain point de la route
-    private fun navigationBearingFlow(route: List<GeoPoint>): Flow<Float> =
-        locationFlow
-            .combine(orientationFlow) { loc, heading ->
-                currentPosition = GeoPoint(loc.latitude, loc.longitude)
-                val next = route.minByOrNull { point: GeoPoint ->
-                    point.distanceToAsDouble(currentPosition)
-                } ?: route.first()
-                
-                val bearingTo = currentPosition.bearingTo(next).toFloat()
-                val angle = (bearingTo - heading) % 360f
-                if (angle < 0) angle + 360f else angle
-            }
-            .distinctUntilChanged()
-            .flowOn(ioDispatcher)
-
+    /**
+     * onCreate
+     * @info : works when the application is launched
+     * @param savedInstanceState : Bundle
+     * @call: configureMap
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // OSMdroid configuration
+
+        // OSM droid configuration
         Configuration.getInstance().load(this, getPreferences(MODE_PRIVATE))
         setContentView(R.layout.activity_main)
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-
-        //Configuration map:
         mapView = findViewById(R.id.map)
         tvInstruction = findViewById(R.id.tvInstruction)
         arrowImageView = findViewById(R.id.arrowImageView)
+        tvDestination = findViewById<TextView>(R.id.etDestination)
         val btnStartNavigation = findViewById<Button>(R.id.btnStartNavigation)
+        val layoutNavigationInput = findViewById<LinearLayout>(R.id.layout_navigation_Input)
         val btnFinishNavigation = findViewById<Button>(R.id.btnFinishNavigation)
-        val tvDestination = findViewById<TextView>(R.id.etDestination)
+        val layoutFilter = findViewById<LinearLayout>(R.id.layout_filter)
 
-        // Masquer les bouton
+        // Hide buttons
         btnStartNavigation.visibility = View.GONE
         btnFinishNavigation.visibility = View.GONE
         tvInstruction.visibility = View.GONE
 
-        //Récuperer la localisation:
+        // Retrieve location:
         fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
             if (location != null) {
                 val lat = location.latitude
@@ -175,10 +152,57 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Spinner config (bike? motorcycle? ...)
+        val spinner = findViewById<Spinner>(R.id.transport_spinner)
+        val icons = listOf(R.drawable.ic_motorbike, R.drawable.ic_bike, R.drawable.ic_car)
+
+        val adapter = object : ArrayAdapter<Int>(this, R.layout.item_icon_only_spinner, icons) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val imageView = LayoutInflater.from(context).inflate(R.layout.item_icon_only_spinner, parent, false) as ImageView
+                imageView.setImageResource(getItem(position)!!)
+                return imageView
+            }
+
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val imageView = LayoutInflater.from(context).inflate(R.layout.item_icon_only_spinner, parent, false) as ImageView
+                imageView.setImageResource(getItem(position)!!)
+                return imageView
+            }
+        }
+        spinner.adapter = adapter
+
+
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                val selectedIcon = icons[position]
+                var newPosition: Int = -1
+
+                when (selectedIcon) {
+                    R.drawable.ic_motorbike -> {
+                        arrowIcon = R.drawable.ic_arrow_motorbike
+                        newPosition = 0
+                    }
+                    R.drawable.ic_bike -> {
+                        arrowIcon = R.drawable.ic_bike_arrow
+                        newPosition = 1
+
+                    }
+                    R.drawable.ic_car -> {
+                        arrowIcon = R.drawable.ic_car_arrow
+                        newPosition = 2
+                    }
+
+                }
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>) {
+                // Optionnel
+            }
+        }
+
         //Recherche de l'itineraire avec la localisation
         findViewById<Button>(R.id.searchNavigationButton).setOnClickListener {
-            val etDestination: EditText = findViewById(R.id.etDestination)
-            val destinationAddress = etDestination.text.toString()
+            val destinationAddress = tvDestination.text.toString()
 
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 if (destinationAddress.isNotEmpty()) {
@@ -186,6 +210,12 @@ class MainActivity : AppCompatActivity() {
 
                     // Afficher bouton "demarrer la navigation"
                     btnStartNavigation.visibility = View.VISIBLE
+                    layoutFilter.visibility = View.GONE
+
+                    val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
+                    params.topMargin = 70 * resources.displayMetrics.density.toInt() // 50dp
+                    mapView.layoutParams = params
+
                 } else {
                     Toast.makeText(this, "Veuillez entrer une destination", Toast.LENGTH_SHORT).show()
                 }
@@ -200,12 +230,28 @@ class MainActivity : AppCompatActivity() {
                         locationFlow.collect {
                             updateArrowOverlay(it)
 
+                            val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
+                            params.topMargin = 0
+                            mapView.layoutParams = params
+
+                            val tvInstructionParams = tvInstruction.layoutParams as ViewGroup.MarginLayoutParams
+                            params.topMargin = 5 * resources.displayMetrics.density.toInt()
+                            tvInstruction.layoutParams = tvInstructionParams
+
+                            val arrowImageViewParams = arrowImageView.layoutParams as ViewGroup.MarginLayoutParams
+                            params.topMargin = 5 * resources.displayMetrics.density.toInt()
+                            arrowImageView.layoutParams = arrowImageViewParams
+
                             // afficher l'instruction
                             tvInstruction.visibility = View.VISIBLE
+                            // Supprimer layout de recherche
+                            layoutNavigationInput.visibility = View.GONE
                             // Supprimer bouton "demarrer la navigation"
                             btnStartNavigation.visibility = View.GONE
                             // Afficher bouton "Arréter la navigation"
                             btnFinishNavigation.visibility = View.VISIBLE
+
+
                         }
                     }
                 }
@@ -215,27 +261,38 @@ class MainActivity : AppCompatActivity() {
         // Arret de la navigation au clic
         findViewById<Button>(R.id.btnFinishNavigation).setOnClickListener {
 
-                // Supprimer l'instruction
-                tvInstruction.visibility = View.GONE
-                // Afficher bouton "demarrer la navigation"
-                btnStartNavigation.visibility = View.VISIBLE
-                // Supprimer bouton "Arreter la navigation"
-                btnFinishNavigation.visibility = View.GONE
+            val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
+            params.topMargin = 150 * resources.displayMetrics.density.toInt() // 150dp
+            mapView.layoutParams = params
 
-                routePoints = emptyList()
-                instructions = emptyList()
-                tvDestination.text = ""
+            // Supprimer bouton "Arreter la navigation"
+            btnFinishNavigation.visibility = View.GONE
+            // Supprimer l'instruction
+            tvInstruction.visibility = View.GONE
+            // Afficher layout de recherche
+            layoutNavigationInput.visibility = View.VISIBLE
+            // Afficher bouton "demarrer la navigation"
+            btnStartNavigation.visibility = View.VISIBLE
+            // Afficher les filtre
+            layoutFilter.visibility = View.VISIBLE
 
+            routePoints = emptyList()
+            instructions = emptyList()
+            tvDestination.text = ""
         }
     }
 
+    /**
+     * getCoordinatesFromAddress
+     * @info : Geocode the address to get the coordinates
+     * @param address : String
+     * @call: displayAddress
+     * @call: getDirections
+     */
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     fun getCoordinatesFromAddress(address: String) {
-        Log.d("GPS", "getCoordinatesFromAddress")
         val geocoder = Geocoder(this)
         try {
-
-            // Effectuer la géocodification
             val finishAddress = geocoder.getFromLocationName(address, 1)!!
 
             if (finishAddress.isNotEmpty() == true) {
@@ -254,90 +311,97 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Appel à l'API pour récupérer les directions
+    /**
+     * getDirections
+     * @info : Call the API to retrieve directions
+     * @param currentLatLng : LatLng
+     * @param destinationLatLng: LatLng
+     * @call: displayVectorPath
+     */
     private fun getDirections(currentLatLng: LatLng, destinationLatLng: LatLng) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-
                 // Liste pour stocker les instructions et les positions
                 val instructionsList = mutableListOf<NavigationInstruction>()
-
                 val response = navigationService.getDirections(currentLatLng, destinationLatLng)
-                // 1. prends la première feature
-                val feature = response.features.firstOrNull()
-
-                // 2. récupère le premier segment
-                val segment = feature?.properties?.segments?.firstOrNull()
-
-                // 3. récupère les steps
-                val steps = segment?.steps ?: emptyList()
-
-
-                // Accès aux features
-                val features = response.features
+                val feature = response.features.firstOrNull() // Prendre la première feature
+                val segment = feature?.properties?.segments?.firstOrNull() // Récupère le premier segment
+                val steps = segment?.steps ?: emptyList() // Récupère les étapes
+                val features = response.features // Accès aux features
 
                 // Itération sur les features
                 for (feature in features) {
                     val segments = feature.properties.segments
 
-                    segments?.forEach { segment ->
-                        val steps = segment.steps // Récupère les étapes
-
-                        // Récupère les coordonnées dans la feature.geometry
-                        val coordinates = feature.geometry?.coordinates ?: emptyList()
+                    segments.forEach { segment ->
+                        // Récupère le tracé vectoriel
+                        val coordinates = feature.geometry.coordinates
+                        var exitNumber: Int? = null
 
                         // Itération sur les étapes pour récupérer l'instruction et les coordonnées
                         for (step in steps) {
                             val instruction = step.instruction // Récupère l'instruction de l'étape
                             val wayPoints = step.way_points // Récupère les way_points
-                            val exitNumber = step.exit_number // Récupère le numéro de sortie
+                            val startCoord = coordinates.getOrNull(wayPoints[0])
+                            val endCoord = coordinates.getOrNull(wayPoints[1])
+                            exitNumber = step.exit_number // Récupère le numéro de sortie
 
-                            // Récupère les coordonnées à partir des indices dans way_points
-                            val startCoord =
-                                coordinates.getOrNull(wayPoints[0]) // Coordonnée de départ
-                            val endCoord = coordinates.getOrNull(wayPoints[1]) // Coordonnée de fin
-
-                            // Si les coordonnées sont valides, créer un GeoPoint et ajouter à la liste
                             if (startCoord != null && endCoord != null) {
-                                val startGeoPoint =
-                                    GeoPoint(startCoord[1], startCoord[0]) // [lat, lon]
-                                val endGeoPoint = GeoPoint(endCoord[1], endCoord[0]) // [lat, lon]
+                                val startGeoPoint = GeoPoint(startCoord[1], startCoord[0])
+                                val endGeoPoint = GeoPoint(endCoord[1], endCoord[0])
 
                                 val bearing = calculateBearing(startGeoPoint, endGeoPoint)
+                                //val afterStartGeoPoint = offsetGeoPoint(startGeoPoint, (bearing + 180) % 360, 10.0)
 
-                                if (exitNumber != null) {
-                                    // Ajouter l'instruction et la coordonnée à la liste
-                                    instructionsList.add(
-                                        NavigationInstruction(
-                                            instruction,
-                                            startGeoPoint,
-                                            getRoundaboutIconFromBearing(bearing)
-                                        )
-                                    )
-                                    instructionsList.add(
-                                        NavigationInstruction(
-                                            instruction,
-                                            endGeoPoint,
-                                            getRoundaboutIconFromBearing(bearing)
-                                        )
-                                    )
-                                } else {
-                                    Log.d("GPS", "Pas de RondPoint: $instruction")
-                                    instructionsList.add(
-                                        NavigationInstruction(
-                                            instruction,
-                                            startGeoPoint,
-                                            getArrowForInstruction(instruction)
-                                        )
-                                    )
-                                    instructionsList.add(
-                                        NavigationInstruction(
-                                            instruction,
-                                            endGeoPoint,
-                                            getArrowForInstruction(instruction)
-                                        )
-                                    )
+                                val geoPoints = feature.geometry.coordinates.map { coord ->
+                                    GeoPoint(coord[1], coord[0])
                                 }
+                                val entryIndex = findClosestIndex(startGeoPoint, geoPoints)
+
+                                val before = geoPoints.getOrNull(entryIndex) ?: geoPoints[entryIndex]
+                                val after = geoPoints.getOrNull(entryIndex + 5) ?: geoPoints.last()
+                                val angle = angleBetweenThreePoints(before, geoPoints[entryIndex], after)
+
+                                if(exitNumber != null) {
+
+                                    val startMaker = Marker(mapView)
+                                    startMaker.position = before
+                                    startMaker.title = "Start Point"
+                                    startMaker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                    mapView.overlays.add(startMaker)
+
+                                    val middleMarker = Marker(mapView)
+                                    middleMarker.position = after
+                                    middleMarker.title = "$angle"
+                                    middleMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                    mapView.overlays.add(middleMarker)
+                                }
+
+
+                                // Ajouter l'instruction et la coordonnée à la liste
+                                instructionsList.add(
+                                    NavigationInstruction(
+                                        instruction,
+                                        startGeoPoint,
+                                        if(exitNumber != null){
+                                            getRoundaboutIconFromBearing(bearing)
+                                        } else {
+                                            getArrowForInstruction(instruction)
+                                        }
+
+                                    )
+                                )
+                                instructionsList.add(
+                                    NavigationInstruction(
+                                        instruction,
+                                        endGeoPoint,
+                                        if(exitNumber != null){
+                                            getRoundaboutIconFromBearing(bearing)
+                                        } else {
+                                            getArrowForInstruction(instruction)
+                                        }
+                                    )
+                                )
                             }
                         }
                     }
@@ -345,9 +409,9 @@ class MainActivity : AppCompatActivity() {
 
                 instructions = instructionsList
 
-                displayMap(response)
+                displayVectorPath(response)
 
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         this@MainActivity,
@@ -359,7 +423,49 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Définir des flèches en fonction de l'instruction
+//-----------------------------------------------------------------------------------------------------
+    fun findClosestIndex(target: GeoPoint, list: List<GeoPoint>): Int {
+        return list.withIndex().minByOrNull { (_, pt) ->
+            pt.distanceToAsDouble(target)
+        }?.index ?: 0
+    }
+
+    fun angleBetweenThreePoints(before: GeoPoint, center: GeoPoint, after: GeoPoint): Double {
+        val v1x = before.longitude - center.longitude
+        val v1y = before.latitude - center.latitude
+        val v2x = after.longitude - center.longitude
+        val v2y = after.latitude - center.latitude
+
+        val dot = v1x * v2x + v1y * v2y
+        val det = v1x * v2y - v1y * v2x
+
+        val angle = atan2(det, dot) // angle signé
+        return Math.toDegrees(angle)
+    }
+
+    // Fonction pour calculer le bearing entre deux points
+    fun calculateBearing(start: GeoPoint, end: GeoPoint): Float {
+        val lat1 = Math.toRadians(start.latitude)
+        val lon1 = Math.toRadians(start.longitude)
+        val lat2 = Math.toRadians(end.latitude)
+        val lon2 = Math.toRadians(end.longitude)
+
+        val deltaLon = lon2 - lon1
+        val y = Math.sin(deltaLon) * Math.cos(lat2)
+        val x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLon)
+
+        val bearing = Math.toDegrees(Math.atan2(y, x))
+        return ((bearing + 360) % 360).toFloat()
+    }
+//-----------------------------------------------------------------------------------------------------
+
+
+    /***
+     * getArrowForInstruction
+     * @info : Display the direction arrow
+     * @param instruction : current instruction
+     * @return : Drawable (icon)
+     */
     fun getArrowForInstruction(instruction: String): Drawable? {
         val slightRight = listOf("slight", "right")
         val slightLeft = listOf("slight", "right")
@@ -385,33 +491,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun calculateBearing(start: GeoPoint, end: GeoPoint): Float {
-        val lat1 = Math.toRadians(start.latitude)
-        val lon1 = Math.toRadians(start.longitude)
-        val lat2 = Math.toRadians(end.latitude)
-        val lon2 = Math.toRadians(end.longitude)
-
-        val dLon = lon2 - lon1
-
-        val x = Math.sin(dLon) * Math.cos(lat2)
-        val y = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
-
-        val initialBearing = Math.atan2(x, y)
-
-        // Convertir l'azimut de radians à degrés
-        var degreeBearing = Math.toDegrees(initialBearing)
-
-        // Normaliser l'angle entre 0 et 360 degrés
-        if (degreeBearing < 0) {
-            degreeBearing += 360
-        }
-
-        return degreeBearing.toFloat()
-    }
-
+    /***
+     * getRoundaboutIconFromBearing
+     * @info : Displays the type of roundabout
+     * @param bearing : current bearing
+     * @return : Drawable (icon)
+     */
     fun getRoundaboutIconFromBearing(bearing: Float): Drawable? {
-        Log.d("GPS", "Le dregres du rond point est: $bearing")
-
         return when (bearing) {
             in 337.5..360.0, in 0.0..22.4 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r1_bk)// N
             in 22.5..67.4 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r2_bk) // NE
@@ -425,7 +511,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun displayMap(response: DirectionsResponse) {
+    /***
+     * displayVectorPath
+     * @info : Displays the navigation vector plot
+     * @param response : All navigation geopoints
+     */
+    private fun displayVectorPath(response: DirectionsResponse) {
 
         routePoints = response.features
             .firstOrNull()?.geometry?.coordinates
@@ -440,45 +531,72 @@ class MainActivity : AppCompatActivity() {
         mapView.invalidate()
     }
 
+    /***
+     * displayAddress
+     * @info : Displays the full address in the text field
+     * @param destinationAddress : full address
+     */
     private fun displayAddress(destinationAddress: String) {
-
-        val tvDestination = findViewById<TextView>(R.id.etDestination)
-
         if (destinationAddress.isNotEmpty()) {
             tvDestination.text = "📍 $destinationAddress"
         }
     }
 
-    /** Configure la carte et la flèche **/
+    /***
+     * configureMap
+     * @info : Map configuration (theme, zoom, center)
+     * @param location : current position
+     * @call : getCoordinatesFromAddress
+     */
     private fun configureMap(location: GeoPoint) {
-
         mapView.setTileSource(TileSourceFactory.MAPNIK)
         mapView.controller.setZoom(18.0)
-
-        // Crée la flèche
-        arrowMarker = Marker(mapView).apply {
-            icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_arrow)
-            setAnchor(Marker.ANCHOR_TOP, Marker.ANCHOR_TOP)
-        }
-
-        // Ajoute la flèche à la carte
-        mapView.overlays.add(arrowMarker)
-
-        arrowMarker.position = location
         mapView.controller.setCenter(location)
         mapView.invalidate()
+
+        displayArrowNavigation(location)
     }
 
-    /** Met à jour position + rotation de la flèche **/
+    /***
+     * displayArrowNavigation
+     * @info : Create a default arrow
+     * @param location : current position
+     */
+    private fun displayArrowNavigation(location: GeoPoint) {
+       if (::mapView.isInitialized && !::arrowMarker.isInitialized) {
+
+           arrowMarker = Marker(mapView).apply {
+               icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_dafault_arrow)
+               setAnchor(Marker.ANCHOR_TOP, Marker.ANCHOR_TOP)
+           }
+
+           mapView.overlays.add(arrowMarker)
+           arrowMarker.position = location
+           mapView.controller.setCenter(location)
+           mapView.invalidate()
+        }
+    }
+
+    /***
+     * updateArrowOverlay
+     * @info : Updates arrow position & rotation
+     * @param position : arrow position
+     */
     private fun updateArrowOverlay(position: Location) {
         val currentGeoPoint = GeoPoint(position.latitude, position.longitude)
         var bearing: Float = position.bearing
 
-        // Met à jour la position de la flèche
+        // Update arrow icon
+        arrowMarker.apply {
+            icon = ContextCompat.getDrawable(this@MainActivity, arrowIcon)
+        }
+        mapView.invalidate()
+
+        // Updates the arrow position
         arrowMarker.position = currentGeoPoint
         arrowMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
 
-        // Met à jour l'orientation de la map & de la flèche
+        // Updates map & arrow orientation
         mapView.mapOrientation = -bearing
         arrowMarker.rotation = 0f
 
@@ -509,6 +627,7 @@ class MainActivity : AppCompatActivity() {
     private var instructionAffichee = false
 
     private fun checkInstructionTrigger(currentLocation: GeoPoint) {
+
         if (currentInstructionIndex >= instructions.size) return
 
         val nextInstruction = instructions[currentInstructionIndex]
