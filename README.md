@@ -9,7 +9,10 @@ Ce projet vise à proposer une alternative **open-source, économique et personn
 L’objectif est de permettre aux conducteurs de **voiture, moto, vélo, trottinette..** de suivre leur itinéraire de manière simple et intuitive, **sans avoir à consulter leur téléphone**.
 
 Les informations affichées incluront :
-- Les instructions de navigation (ex.: "Dans 500 mètres, tourner à droite").
+- Les instructions de navigation:
+  - Affichage du tracé de l’itinéraire sur la carte sous forme de ligne vectorielle.
+  - Fleche directionnelle (tourner à droite..).
+  - Distance restante avant la prochaine instruction de navigation (ex: "50 mètres").
 - Le temps restant avant d’arriver à destination.
 - L’heure d’arrivée estimée.
 
