@@ -7,6 +7,12 @@ val orsApiKey = rootProject.file("local.properties")
     ?.let { Properties().apply { load(it.inputStream()) } }
     ?.getProperty("ORS_API_KEY") ?: throw GradleException("ORS_API_KEY not found in local.properties")
 
+// Lire la clé API depuis local.properties
+val ghApiKey = rootProject.file("local.properties")
+    .takeIf { it.exists() }
+    ?.let { Properties().apply { load(it.inputStream()) } }
+    ?.getProperty("GH_API_KEY") ?: throw GradleException("GH_API_KEY not found in local.properties")
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -29,6 +35,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "ORS_API_KEY", "\"$orsApiKey\"")
+        buildConfigField("String", "GH_API_KEY", "\"$ghApiKey\"")
     }
 
     buildFeatures {

@@ -34,10 +34,8 @@ import android.widget.Toast
 import androidx.annotation.RequiresPermission
 import com.google.android.gms.maps.model.LatLng
 import com.quentin.navigationapp.data.NavigationService
-import com.quentin.navigationapp.model.DirectionsResponse
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.withContext
 import org.osmdroid.views.overlay.Polyline
 import kotlin.math.atan2
 import android.widget.ArrayAdapter
@@ -46,7 +44,7 @@ import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.LinearLayout
 import android.widget.Spinner
-
+import com.quentin.navigationapp.network.Path
 
 class MainActivity : AppCompatActivity() {
 
@@ -60,6 +58,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvInstruction: TextView
     private lateinit var arrowImageView: ImageView
     private lateinit var tvDestination: TextView
+    private lateinit var layoutInstruction: LinearLayout
     private var arrowIcon: Int = R.drawable.ic_arrow_motorbike
 
     private lateinit var instructions: List<NavigationInstruction>
@@ -130,6 +129,7 @@ class MainActivity : AppCompatActivity() {
         tvInstruction = findViewById(R.id.tvInstruction)
         arrowImageView = findViewById(R.id.arrowImageView)
         tvDestination = findViewById<TextView>(R.id.etDestination)
+        layoutInstruction = findViewById<LinearLayout>(R.id.layout_instruction)
         val btnStartNavigation = findViewById<Button>(R.id.btnStartNavigation)
         val layoutNavigationInput = findViewById<LinearLayout>(R.id.layout_navigation_Input)
         val btnFinishNavigation = findViewById<Button>(R.id.btnFinishNavigation)
@@ -138,7 +138,7 @@ class MainActivity : AppCompatActivity() {
         // Hide buttons
         btnStartNavigation.visibility = View.GONE
         btnFinishNavigation.visibility = View.GONE
-        tvInstruction.visibility = View.GONE
+        layoutInstruction.visibility = View.GONE
 
         // Retrieve location:
         fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
@@ -234,16 +234,13 @@ class MainActivity : AppCompatActivity() {
                             params.topMargin = 0
                             mapView.layoutParams = params
 
-                            val tvInstructionParams = tvInstruction.layoutParams as ViewGroup.MarginLayoutParams
-                            params.topMargin = 5 * resources.displayMetrics.density.toInt()
-                            tvInstruction.layoutParams = tvInstructionParams
+                            val tvInstructionParams = layoutInstruction.layoutParams as ViewGroup.MarginLayoutParams
+                            tvInstructionParams.topMargin = 10 * resources.displayMetrics.density.toInt()
+                            layoutInstruction.layoutParams = tvInstructionParams
 
-                            val arrowImageViewParams = arrowImageView.layoutParams as ViewGroup.MarginLayoutParams
-                            params.topMargin = 5 * resources.displayMetrics.density.toInt()
-                            arrowImageView.layoutParams = arrowImageViewParams
 
                             // afficher l'instruction
-                            tvInstruction.visibility = View.VISIBLE
+                            layoutInstruction.visibility = View.VISIBLE
                             // Supprimer layout de recherche
                             layoutNavigationInput.visibility = View.GONE
                             // Supprimer bouton "demarrer la navigation"
@@ -320,172 +317,101 @@ class MainActivity : AppCompatActivity() {
      */
     private fun getDirections(currentLatLng: LatLng, destinationLatLng: LatLng) {
         CoroutineScope(Dispatchers.IO).launch {
+
             try {
-                // Liste pour stocker les instructions et les positions
-                val instructionsList = mutableListOf<NavigationInstruction>()
-                val response = navigationService.getDirections(currentLatLng, destinationLatLng)
-                val feature = response.features.firstOrNull() // Prendre la première feature
-                val segment = feature?.properties?.segments?.firstOrNull() // Récupère le premier segment
-                val steps = segment?.steps ?: emptyList() // Récupère les étapes
-                val features = response.features // Accès aux features
+                val navInstructions = mutableListOf<NavigationInstruction>()
 
-                // Itération sur les features
-                for (feature in features) {
-                    val segments = feature.properties.segments
+                // Appel à l'API
+                val responseTeste = navigationService.getRoute(currentLatLng, destinationLatLng)
+                val ghResponse: Path? = responseTeste.paths.firstOrNull()
 
-                    segments.forEach { segment ->
-                        // Récupère le tracé vectoriel
-                        val coordinates = feature.geometry.coordinates
-                        var exitNumber: Int? = null
+                if (ghResponse != null) {
 
-                        // Itération sur les étapes pour récupérer l'instruction et les coordonnées
-                        for (step in steps) {
-                            val instruction = step.instruction // Récupère l'instruction de l'étape
-                            val wayPoints = step.way_points // Récupère les way_points
-                            val startCoord = coordinates.getOrNull(wayPoints[0])
-                            val endCoord = coordinates.getOrNull(wayPoints[1])
-                            exitNumber = step.exit_number // Récupère le numéro de sortie
+                    val totalDistanceMeters = ghResponse.distance
+                    val totalTimeMillis = ghResponse.time
 
-                            if (startCoord != null && endCoord != null) {
-                                val startGeoPoint = GeoPoint(startCoord[1], startCoord[0])
-                                val endGeoPoint = GeoPoint(endCoord[1], endCoord[0])
+                    val points = ghResponse.points
+                    val coordinates = points.coordinates
 
-                                val bearing = calculateBearing(startGeoPoint, endGeoPoint)
-                                //val afterStartGeoPoint = offsetGeoPoint(startGeoPoint, (bearing + 180) % 360, 10.0)
-
-                                val geoPoints = feature.geometry.coordinates.map { coord ->
-                                    GeoPoint(coord[1], coord[0])
-                                }
-                                val entryIndex = findClosestIndex(startGeoPoint, geoPoints)
-
-                                val before = geoPoints.getOrNull(entryIndex) ?: geoPoints[entryIndex]
-                                val after = geoPoints.getOrNull(entryIndex + 5) ?: geoPoints.last()
-                                val angle = angleBetweenThreePoints(before, geoPoints[entryIndex], after)
-
-                                if(exitNumber != null) {
-
-                                    val startMaker = Marker(mapView)
-                                    startMaker.position = before
-                                    startMaker.title = "Start Point"
-                                    startMaker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                                    mapView.overlays.add(startMaker)
-
-                                    val middleMarker = Marker(mapView)
-                                    middleMarker.position = after
-                                    middleMarker.title = "$angle"
-                                    middleMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                                    mapView.overlays.add(middleMarker)
-                                }
-
-
-                                // Ajouter l'instruction et la coordonnée à la liste
-                                instructionsList.add(
-                                    NavigationInstruction(
-                                        instruction,
-                                        startGeoPoint,
-                                        if(exitNumber != null){
-                                            getRoundaboutIconFromBearing(bearing)
-                                        } else {
-                                            getArrowForInstruction(instruction)
-                                        }
-
-                                    )
-                                )
-                                instructionsList.add(
-                                    NavigationInstruction(
-                                        instruction,
-                                        endGeoPoint,
-                                        if(exitNumber != null){
-                                            getRoundaboutIconFromBearing(bearing)
-                                        } else {
-                                            getArrowForInstruction(instruction)
-                                        }
-                                    )
-                                )
-                            }
-                        }
+                    val coordinatesGeoPoints: List<GeoPoint> = coordinates.map { (lon, lat) ->
+                        GeoPoint(lat, lon)
                     }
+
+                    ghResponse.instructions.forEach { instr ->
+
+                        // Récupère les indices de début et fin dans geoPoints
+                        val (startIdx, endIdx) = instr.interval
+                        val arrow: Drawable?
+
+                        val startGeoPoint = coordinatesGeoPoints[startIdx]
+                        val endGeoPoint = coordinatesGeoPoints[endIdx]
+
+                        val sign: Int? = instr.sign
+
+
+
+                        if (sign == 6) {
+
+
+                            val turnAngle: Double? = instr.turn_angle
+
+                            Log.d("OtherAPI", "Instruction: $instr.text")
+
+                            arrow = getRoundaboutIconFromBearing(turnAngle)
+                        }else {
+                            arrow = getArrowForInstruction(sign)
+                        }
+
+                        navInstructions += NavigationInstruction(
+                            message = instr.text,
+                            location = startGeoPoint,
+                            arrow = arrow
+                        )
+                        navInstructions += NavigationInstruction(
+                            message = instr.text,
+                            location = endGeoPoint,
+                            arrow = arrow
+                        )
+                    }
+
+                    instructions = navInstructions
+
+                    displayVectorPath(coordinatesGeoPoints)
+
                 }
-
-                instructions = instructionsList
-
-                displayVectorPath(response)
-
-            } catch (_: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Erreur lors de la récupération des directions",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
+            }catch (e: Exception) {
+                Log.e("OtherAPI", "Erreur: $e")
             }
         }
     }
 
-//-----------------------------------------------------------------------------------------------------
-    fun findClosestIndex(target: GeoPoint, list: List<GeoPoint>): Int {
-        return list.withIndex().minByOrNull { (_, pt) ->
-            pt.distanceToAsDouble(target)
-        }?.index ?: 0
-    }
-
-    fun angleBetweenThreePoints(before: GeoPoint, center: GeoPoint, after: GeoPoint): Double {
-        val v1x = before.longitude - center.longitude
-        val v1y = before.latitude - center.latitude
-        val v2x = after.longitude - center.longitude
-        val v2y = after.latitude - center.latitude
-
-        val dot = v1x * v2x + v1y * v2y
-        val det = v1x * v2y - v1y * v2x
-
-        val angle = atan2(det, dot) // angle signé
-        return Math.toDegrees(angle)
-    }
-
-    // Fonction pour calculer le bearing entre deux points
-    fun calculateBearing(start: GeoPoint, end: GeoPoint): Float {
-        val lat1 = Math.toRadians(start.latitude)
-        val lon1 = Math.toRadians(start.longitude)
-        val lat2 = Math.toRadians(end.latitude)
-        val lon2 = Math.toRadians(end.longitude)
-
-        val deltaLon = lon2 - lon1
-        val y = Math.sin(deltaLon) * Math.cos(lat2)
-        val x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLon)
-
-        val bearing = Math.toDegrees(Math.atan2(y, x))
-        return ((bearing + 360) % 360).toFloat()
-    }
-//-----------------------------------------------------------------------------------------------------
-
-
-    /***
+    /**
      * getArrowForInstruction
      * @info : Display the direction arrow
-     * @param instruction : current instruction
+     * @param sign : Code that identifies the specific navigation maneuver
      * @return : Drawable (icon)
      */
-    fun getArrowForInstruction(instruction: String): Drawable? {
-        val slightRight = listOf("slight", "right")
-        val slightLeft = listOf("slight", "right")
+    fun getArrowForInstruction(sign: Int?): Drawable? {
 
-        return when {
-            slightRight.any { keyword -> instruction.contains(keyword, ignoreCase = true) } -> {
-                ContextCompat.getDrawable(this, R.drawable.nav_right_1_bk)
-            }
-            slightLeft.any { keyword -> instruction.contains(keyword, ignoreCase = true) } -> {
-                ContextCompat.getDrawable(this, R.drawable.nav_left_1_bk)
-            }
-            instruction.contains("right", ignoreCase = true) -> {
-                ContextCompat.getDrawable(this, R.drawable.nav_right_2_bk)
-            }
-            instruction.contains("left", ignoreCase = true) -> {
-                ContextCompat.getDrawable(this, R.drawable.nav_left_2_bk)
-            }
-            instruction.contains("straight", ignoreCase = true) -> {
-                ContextCompat.getDrawable(this, R.drawable.nav_straight_bk)
-            }
+        return when (sign){
+            //Tout droit
+            0 -> {ContextCompat.getDrawable(this, R.drawable.nav_straight_bk)}
+
+            //left
+            -3-> {ContextCompat.getDrawable(this, R.drawable.nav_left_2_bk)}// serrer
+            -2 -> {ContextCompat.getDrawable(this, R.drawable.nav_left_2_bk)}// simple
+            -1 -> {ContextCompat.getDrawable(this, R.drawable.nav_left_1_bk)}// leger
+
+            //right
+            3 -> {ContextCompat.getDrawable(this, R.drawable.nav_right_2_bk)}// serrer
+            2 -> {ContextCompat.getDrawable(this, R.drawable.nav_right_2_bk)}// simple
+            1 -> {ContextCompat.getDrawable(this, R.drawable.nav_right_1_bk)}// leger
+
+            //Rester à gauche (garder la file de gauche)
+            7 -> {ContextCompat.getDrawable(this, R.drawable.nav_left_1_bk)}
+
+            //Rester à droite (garder la file de droite)
+            8 -> {ContextCompat.getDrawable(this, R.drawable.nav_right_1_bk)}
 
             else -> null // Pas de flèche si l'instruction est autre
         }
@@ -497,16 +423,22 @@ class MainActivity : AppCompatActivity() {
      * @param bearing : current bearing
      * @return : Drawable (icon)
      */
-    fun getRoundaboutIconFromBearing(bearing: Float): Drawable? {
-        return when (bearing) {
-            in 337.5..360.0, in 0.0..22.4 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r1_bk)// N
-            in 22.5..67.4 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r2_bk) // NE
-            in 67.5..112.4 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r3_bk) // E
-            in 112.5..157.4 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r4_bk) // SE
-            in 157.5..202.4 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r5_bk) // S
-            in 202.5..247.4 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r6_bk) // SW
-            in 247.5..292.4 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r7_bk) // W
-            in 292.5..337.4 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r8_bk) // NW
+    fun getRoundaboutIconFromBearing(bearing: Double?): Drawable? {
+        val safeBearing = bearing ?: 0.0
+        val angleDeg = Math.toDegrees(safeBearing)
+
+        Log.d("OtherAPI", "Angle: ${angleDeg}")
+        Log.d("OtherAPI", "_________________________________")
+
+        return when (angleDeg) {
+            in -70.0..-0.0 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r1_bk) // N
+            in -120.0..-70.0 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r2_bk) // NE
+            in -170.0..-120.0 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r3_bk) // E
+            in -190.0..-170.0 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r4_bk) // SE
+            in -230.0..-190.0 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r5_bk) // S
+            in -280.0..-230.0 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r6_bk) // SW
+            in -340.0..-280.0 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r7_bk) // W
+            in -360.0..-340.0 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r8_bk) // NW
             else -> null
         }
     }
@@ -516,11 +448,9 @@ class MainActivity : AppCompatActivity() {
      * @info : Displays the navigation vector plot
      * @param response : All navigation geopoints
      */
-    private fun displayVectorPath(response: DirectionsResponse) {
+    private fun displayVectorPath(coordinates: List<GeoPoint>) {
 
-        routePoints = response.features
-            .firstOrNull()?.geometry?.coordinates
-            ?.map { GeoPoint(it[1], it[0]) } ?: emptyList()
+        routePoints = coordinates.map { GeoPoint(it.latitude, it.longitude) }
 
         val roadOverlay = Polyline()
         roadOverlay.setPoints(routePoints)
@@ -630,27 +560,16 @@ class MainActivity : AppCompatActivity() {
 
         if (currentInstructionIndex >= instructions.size) return
 
+        val currentInstruction = instructions[currentInstructionIndex]
+        val instructionPoint = currentInstruction.location
+        val distanceToInstruction = currentLocation.distanceToAsDouble(instructionPoint)
         val nextInstruction = instructions[currentInstructionIndex]
-        val distance = currentLocation.distanceToAsDouble(nextInstruction.location)
 
-        // 🔹 Étape 1 : afficher l’instruction quand on approche (mais une seule fois)
-        if (distance < 100.0 && !instructionAffichee) {
+        if (distanceToInstruction < 80 && currentInstructionIndex < instructions.size - 1) {
             showInstruction(nextInstruction)
             instructionAffichee = true
         }
 
-        //TODO: Ne fonctionne pas parfaitement!
-        /*
-        // 🔹 Étape 2 : quand on s’éloigne, on passe à la suivante et on vide l’affichage
-        if (instructionAffichee && distance > 120.0) {
-            instructionAffichee = false
-            currentInstructionIndex++
-            tvInstruction.text = ""
-
-            // Affiche l’état "neutre" : flèche tout droit
-            arrowImageView.setImageDrawable(getArrowForInstruction("straight"))
-            tvInstruction.text = "Continuez tout droit" // ou "Continuez tout droit"
-        }*/
     }
 
     private fun showInstruction(nextInstruction: NavigationInstruction) {

@@ -64,27 +64,38 @@
         android:layout_height="match_parent"
         />
 
-    <!-- ImageView pour la flèche -->
-    <ImageView
-        android:id="@+id/arrowImageView"
-        android:layout_width="60dp"
-        android:layout_height="60dp"
+    <LinearLayout
+        android:id="@+id/layout_instruction"
         android:layout_marginTop="155dp"
-        android:layout_marginStart="10dp"
-        android:contentDescription="@string/image" />
-
-    <TextView
-        android:id="@+id/tvInstruction"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="155dp"
-        android:layout_marginStart="75dp"
-        android:layout_marginEnd="20dp"
-        android:text="@string/instruction"
-        android:textSize="18sp"
-        android:padding="16dp"
-        android:textColor="#000000"
-        android:gravity="center" />
+        android:orientation="horizontal"
+        android:background="@drawable/rounded_black_background"
+        android:layout_marginRight="10dp"
+        android:layout_marginLeft="10dp"
+        map:layout_constraintTop_toTopOf="parent">
+
+        <!-- ImageView pour la flèche -->
+        <ImageView
+            android:id="@+id/arrowImageView"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:layout_margin="10dp"
+            android:contentDescription="@string/image"
+            android:background="@drawable/rounded_white_background"/>
+
+        <TextView
+            android:id="@+id/tvInstruction"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="20dp"
+            android:text="@string/instruction"
+            android:textSize="18sp"
+            android:padding="16dp"
+            android:color="#FFFFFF"
+            android:gravity="center" />
+    </LinearLayout>
 
     <!-- Bouton pour lancer la navigation -->
     <Button
