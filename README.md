@@ -22,4 +22,19 @@ Pour mieux comprendre l’architecture et les choix métiers, consultez les fich
 
 - [Roadmap de recherche (pistes & orientations)](documentation/01_research_roadmap.md)
 - [Solutions existantes comparées](documentation/02_existing_solutions.md)
-- [Solutions envisagées (comparatif)](documentation/03_proposed_solutions.md) 
+- [Solutions envisagées (comparatif)](documentation/03_proposed_solutions.md)
+
+
+## ESP32 Project – Système embarqué avec vue éclatée technique
+
+![Vue éclatée de l’ESP32](./images/Exploded_view_drawing.png)
+
+**Vue éclatée de l’appareil**:
+
+- **Coque**: Impression 3D en PLA.
+- **Verre protecteur**: Offre une protection supplémentaire contre:
+  - les rayures liées à l’usage quotidien,
+  - les chocs légers, 
+  - les projections d’eau légères, comme des gouttes de pluie occasionnelles.
+- **ESP32/Display**: Microcontrôleur avec écran intégré.
+- **Batterie LiPo 3.7V**: Alimentation rechargeable, placée en fond de boîtier.
