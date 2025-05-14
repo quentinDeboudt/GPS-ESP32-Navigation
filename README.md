@@ -38,3 +38,10 @@ Pour mieux comprendre l’architecture et les choix métiers, consultez les fich
   - les projections d’eau légères, comme des gouttes de pluie occasionnelles.
 - **ESP32/Display**: Microcontrôleur avec écran intégré.
 - **Batterie LiPo 3.7V**: Alimentation rechargeable, placée en fond de boîtier.
+
+
+## ESP32 Project – Aperçus de l'interface utilisateur (Mockup)
+1. Connexion au téléphone via Bluetooth.
+2. Écran de préchargement des données.
+3. Vue de la navigation.
+![Interface](./images/Interface_ESP_Display.png)
