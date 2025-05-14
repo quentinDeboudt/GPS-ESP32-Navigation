@@ -32,8 +32,8 @@ Pour mieux comprendre l’architecture et les choix métiers, consultez les fich
 
 ## ✏️ ESP32 Project – Système embarqué avec vue éclatée technique
 
-![Vue éclatée de l’ESP32](./images/Exploded_view_drawing.png)
-<img src="images/Exploded_view_drawing.png" width="200"/>
+<img src="images/Exploded_view_drawing.png" width="500"/>
+
 **Vue éclatée de l’appareil**:
 
 - **Coque**: Impression 3D en PLA.
@@ -49,4 +49,5 @@ Pour mieux comprendre l’architecture et les choix métiers, consultez les fich
 1. Connexion au téléphone via Bluetooth.
 2. Écran de préchargement des données.
 3. Vue de la navigation.
-![Interface](./images/Interface_ESP_Display.png)
+
+<img src="images/Interface_ESP_Display.png" width="500"/>
