@@ -16,7 +16,7 @@ Cependant, plusieurs limitations rendent cette option peu adaptée :
 L'**application de navigation GPS** Android permet :
 
 
-- [x] Saisie de la destination finale et génération d’un tracé vectoriel (via **OpenMapService**).
+- [x] Saisie de la destination finale et génération d’un tracé vectoriel (via **GraphHopper**).
 - [x] Clic sur **“Démarrer la navigation”** pour lancer le guidage.
 - [x] Récupération en temps réel de la position GPS de l’utilisateur.
 - [x] Affichage des instructions au fur et à mesure (ex. : “dans 100 m, tourner à droite” + flèches directionnelles…).
