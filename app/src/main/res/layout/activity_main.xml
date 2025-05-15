@@ -97,28 +97,69 @@
             android:gravity="center" />
     </LinearLayout>
 
-    <!-- Bouton pour lancer la navigation -->
-    <Button
-        android:id="@+id/btnStartNavigation"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:id="@+id/layout_control"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/lancer_la_navigation"
+        android:orientation="horizontal"
         android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="50dp"
-        android:backgroundTint="@color/black"
-        android:textColor="@android:color/white"
-        android:elevation="6dp" />
+        android:background="@drawable/rounded_black_background"
+        android:layout_marginRight="10dp"
+        android:layout_marginLeft="10dp"
+        android:layout_marginBottom="10dp"
+        map:layout_constraintTop_toTopOf="parent">
 
-    <!-- 2. Bouton pour lancer la navigation -->
-    <Button
-        android:id="@+id/btnFinishNavigation"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/arreter_la_navigation"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="50dp"
-        android:backgroundTint="@color/black"
-        android:textColor="@android:color/white"
-        android:elevation="6dp" />
+        <TextView
+            android:id="@+id/navigation_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:text="@string/time"
+            android:textSize="18sp"
+            android:padding="16dp"
+            android:color="#FFFFFF"
+            android:gravity="center" />
 
+        <TextView
+            android:id="@+id/navigation_distance"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:text="@string/distance"
+            android:textSize="18sp"
+            android:padding="16dp"
+            android:color="#FFFFFF"
+            android:gravity="center" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- Bouton pour lancer la navigation -->
+        <Button
+            android:id="@+id/btnStartNavigation"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|center_horizontal"
+            android:drawableStart="@drawable/round_navigation_white_48"
+            android:backgroundTint="@color/black"
+            android:textColor="@android:color/white"
+            android:contentDescription="@string/start_navigation_description"
+            android:elevation="6dp" />
+
+        <!-- 2. Bouton pour arreter la navigation -->
+        <Button
+            android:id="@+id/btnFinishNavigation"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:backgroundTint="@color/black"
+            android:drawableStart="@drawable/osm_ic_follow_me"
+            android:textColor="@android:color/white"
+            android:elevation="6dp"
+            android:contentDescription="@string/stop_navigation_description"
+            android:visibility="gone"/>
+    </LinearLayout>
 </FrameLayout>

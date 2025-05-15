@@ -30,7 +30,7 @@ Pour mieux comprendre l’architecture et les choix métiers, consultez les fich
 - [Solutions envisagées (comparatif)](documentation/03_proposed_solutions.md)
 
 
-## ✏️ ESP32 Project – Système embarqué avec vue éclatée technique
+## ✏️ ESP32 Project – Système embarqué (vue éclatée)
 
 <img src="images/Exploded_view_drawing.png" width="500"/>
 
@@ -51,3 +51,8 @@ Pour mieux comprendre l’architecture et les choix métiers, consultez les fich
 3. Vue de la navigation.
 
 <img src="images/Interface_ESP_Display.png" width="500"/>
+
+
+## ✏️ ESP32 Project
+<img src="images/Bike.png" width="200"/>
+<img src="images/MotoBike.png" width="200"/>

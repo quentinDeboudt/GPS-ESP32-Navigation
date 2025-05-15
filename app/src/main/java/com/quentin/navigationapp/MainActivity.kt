@@ -1,6 +1,7 @@
 package com.quentin.navigationapp
 
 import android.Manifest
+import android.animation.ValueAnimator
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.Drawable
@@ -37,7 +38,6 @@ import com.quentin.navigationapp.data.NavigationService
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import org.osmdroid.views.overlay.Polyline
-import kotlin.math.atan2
 import android.widget.ArrayAdapter
 import android.view.LayoutInflater
 import android.view.ViewGroup
@@ -45,6 +45,8 @@ import android.widget.AdapterView
 import android.widget.LinearLayout
 import android.widget.Spinner
 import com.quentin.navigationapp.network.Path
+import kotlinx.coroutines.Job
+import kotlin.math.round
 
 class MainActivity : AppCompatActivity() {
 
@@ -59,10 +61,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var arrowImageView: ImageView
     private lateinit var tvDestination: TextView
     private lateinit var layoutInstruction: LinearLayout
+    private lateinit var layoutControl: LinearLayout
+    private lateinit var navigationTime: TextView
+    private lateinit var navigationDistance: TextView
     private var arrowIcon: Int = R.drawable.ic_arrow_motorbike
 
     private lateinit var instructions: List<NavigationInstruction>
     private var lastPosition: Location? = null
+    private var currentInstructionIndex = 0
+    private var lastCenter: GeoPoint? = null
 
     data class NavigationInstruction(
         val message: String,
@@ -97,7 +104,6 @@ class MainActivity : AppCompatActivity() {
             }
 
             try {
-                Log.d("GPS", "Géolocalisation mise à jours..")
                 fusedLocationClient.requestLocationUpdates(req, cb, Looper.getMainLooper())
                 awaitClose { fusedLocationClient.removeLocationUpdates(cb) }
             } catch (e: SecurityException) {
@@ -130,6 +136,9 @@ class MainActivity : AppCompatActivity() {
         arrowImageView = findViewById(R.id.arrowImageView)
         tvDestination = findViewById<TextView>(R.id.etDestination)
         layoutInstruction = findViewById<LinearLayout>(R.id.layout_instruction)
+        layoutControl = findViewById<LinearLayout>(R.id.layout_control)
+        navigationTime = findViewById<TextView>(R.id.navigation_time)
+        navigationDistance = findViewById<TextView>(R.id.navigation_distance)
         val btnStartNavigation = findViewById<Button>(R.id.btnStartNavigation)
         val layoutNavigationInput = findViewById<LinearLayout>(R.id.layout_navigation_Input)
         val btnFinishNavigation = findViewById<Button>(R.id.btnFinishNavigation)
@@ -139,6 +148,7 @@ class MainActivity : AppCompatActivity() {
         btnStartNavigation.visibility = View.GONE
         btnFinishNavigation.visibility = View.GONE
         layoutInstruction.visibility = View.GONE
+        layoutControl.visibility = View.GONE
 
         // Retrieve location:
         fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
@@ -209,6 +219,7 @@ class MainActivity : AppCompatActivity() {
                     getCoordinatesFromAddress(destinationAddress)
 
                     // Afficher bouton "demarrer la navigation"
+                    layoutControl.visibility = View.VISIBLE
                     btnStartNavigation.visibility = View.VISIBLE
                     layoutFilter.visibility = View.GONE
 
@@ -226,30 +237,27 @@ class MainActivity : AppCompatActivity() {
         requestPermissionsIfNeeded {
             findViewById<Button>(R.id.btnStartNavigation).setOnClickListener {
                 lifecycleScope.launch {
-                    lifecycleScope.launch {
-                        locationFlow.collect {
-                            updateArrowOverlay(it)
+                    locationFlow.collect {
+                        updateArrowOverlay(it)
 
-                            val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
-                            params.topMargin = 0
-                            mapView.layoutParams = params
+                        val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
+                        params.topMargin = 0
+                        mapView.layoutParams = params
 
-                            val tvInstructionParams = layoutInstruction.layoutParams as ViewGroup.MarginLayoutParams
-                            tvInstructionParams.topMargin = 10 * resources.displayMetrics.density.toInt()
-                            layoutInstruction.layoutParams = tvInstructionParams
-
-
-                            // afficher l'instruction
-                            layoutInstruction.visibility = View.VISIBLE
-                            // Supprimer layout de recherche
-                            layoutNavigationInput.visibility = View.GONE
-                            // Supprimer bouton "demarrer la navigation"
-                            btnStartNavigation.visibility = View.GONE
-                            // Afficher bouton "Arréter la navigation"
-                            btnFinishNavigation.visibility = View.VISIBLE
+                        val tvInstructionParams = layoutInstruction.layoutParams as ViewGroup.MarginLayoutParams
+                        tvInstructionParams.topMargin = 10 * resources.displayMetrics.density.toInt()
+                        layoutInstruction.layoutParams = tvInstructionParams
 
 
-                        }
+                        // afficher l'instruction
+                        layoutInstruction.visibility = View.VISIBLE
+                        // Supprimer layout de recherche
+                        layoutNavigationInput.visibility = View.GONE
+                        // Supprimer bouton "demarrer la navigation"
+                        btnStartNavigation.visibility = View.GONE
+                        // Afficher bouton "Arréter la navigation"
+                        btnFinishNavigation.visibility = View.VISIBLE
+
                     }
                 }
             }
@@ -264,6 +272,9 @@ class MainActivity : AppCompatActivity() {
 
             // Supprimer bouton "Arreter la navigation"
             btnFinishNavigation.visibility = View.GONE
+
+            // Afficher layout de recherche
+            layoutNavigationInput.visibility = View.VISIBLE
             // Supprimer l'instruction
             tvInstruction.visibility = View.GONE
             // Afficher layout de recherche
@@ -272,6 +283,9 @@ class MainActivity : AppCompatActivity() {
             btnStartNavigation.visibility = View.VISIBLE
             // Afficher les filtre
             layoutFilter.visibility = View.VISIBLE
+
+            var locationJob: Job? = null
+            locationJob?.cancel()
 
             routePoints = emptyList()
             instructions = emptyList()
@@ -326,12 +340,12 @@ class MainActivity : AppCompatActivity() {
                 val ghResponse: Path? = responseTeste.paths.firstOrNull()
 
                 if (ghResponse != null) {
-
-                    val totalDistanceMeters = ghResponse.distance
-                    val totalTimeMillis = ghResponse.time
-
                     val points = ghResponse.points
                     val coordinates = points.coordinates
+
+                    val totalMinutes = formatTime(ghResponse.time)
+                    val totalKilometers = ghResponse.distance / 1000.0
+
 
                     val coordinatesGeoPoints: List<GeoPoint> = coordinates.map { (lon, lat) ->
                         GeoPoint(lat, lon)
@@ -339,24 +353,16 @@ class MainActivity : AppCompatActivity() {
 
                     ghResponse.instructions.forEach { instr ->
 
+                        Log.d("GPS", "3. ghResponse")
                         // Récupère les indices de début et fin dans geoPoints
                         val (startIdx, endIdx) = instr.interval
                         val arrow: Drawable?
-
                         val startGeoPoint = coordinatesGeoPoints[startIdx]
                         val endGeoPoint = coordinatesGeoPoints[endIdx]
-
                         val sign: Int? = instr.sign
 
-
-
                         if (sign == 6) {
-
-
                             val turnAngle: Double? = instr.turn_angle
-
-                            Log.d("OtherAPI", "Instruction: $instr.text")
-
                             arrow = getRoundaboutIconFromBearing(turnAngle)
                         }else {
                             arrow = getArrowForInstruction(sign)
@@ -377,12 +383,22 @@ class MainActivity : AppCompatActivity() {
                     instructions = navInstructions
 
                     displayVectorPath(coordinatesGeoPoints)
-
                 }
             }catch (e: Exception) {
                 Log.e("OtherAPI", "Erreur: $e")
             }
         }
+    }
+
+    fun formatTime(milliseconds: Long): String {
+        val seconds = milliseconds / 1000
+        val minutes = seconds / 60
+        val hours = minutes / 60
+        val remainingMinutes = minutes % 60
+        val remainingSeconds = seconds % 60
+
+        // Format : heures:minutes:secondes
+        return String.format("%02d:%02d:%02d", hours, remainingMinutes, remainingSeconds)
     }
 
     /**
@@ -417,7 +433,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /***
+    /**
      * getRoundaboutIconFromBearing
      * @info : Displays the type of roundabout
      * @param bearing : current bearing
@@ -426,9 +442,6 @@ class MainActivity : AppCompatActivity() {
     fun getRoundaboutIconFromBearing(bearing: Double?): Drawable? {
         val safeBearing = bearing ?: 0.0
         val angleDeg = Math.toDegrees(safeBearing)
-
-        Log.d("OtherAPI", "Angle: ${angleDeg}")
-        Log.d("OtherAPI", "_________________________________")
 
         return when (angleDeg) {
             in -70.0..-0.0 -> ContextCompat.getDrawable(this, R.drawable.nav_roundabout_r1_bk) // N
@@ -443,10 +456,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /***
+    /**
      * displayVectorPath
      * @info : Displays the navigation vector plot
-     * @param response : All navigation geopoints
+     * @param coordinates : List<GeoPoint>
      */
     private fun displayVectorPath(coordinates: List<GeoPoint>) {
 
@@ -461,7 +474,7 @@ class MainActivity : AppCompatActivity() {
         mapView.invalidate()
     }
 
-    /***
+    /**
      * displayAddress
      * @info : Displays the full address in the text field
      * @param destinationAddress : full address
@@ -472,7 +485,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /***
+    /**
      * configureMap
      * @info : Map configuration (theme, zoom, center)
      * @param location : current position
@@ -487,7 +500,7 @@ class MainActivity : AppCompatActivity() {
         displayArrowNavigation(location)
     }
 
-    /***
+    /**
      * displayArrowNavigation
      * @info : Create a default arrow
      * @param location : current position
@@ -507,9 +520,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /***
+    /**
      * updateArrowOverlay
-     * @info : Updates arrow position & rotation
+     * @info : Updates arrow
      * @param position : arrow position
      */
     private fun updateArrowOverlay(position: Location) {
@@ -520,42 +533,78 @@ class MainActivity : AppCompatActivity() {
         arrowMarker.apply {
             icon = ContextCompat.getDrawable(this@MainActivity, arrowIcon)
         }
-        mapView.invalidate()
 
-        // Updates the arrow position
-        arrowMarker.position = currentGeoPoint
-        arrowMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-
-        // Updates map & arrow orientation
-        mapView.mapOrientation = -bearing
-        arrowMarker.rotation = 0f
-
-        checkInstructionTrigger(GeoPoint(position.latitude, position.longitude))
-        smoothCenterTo(GeoPoint(position.latitude, position.longitude))
-
-        mapView.controller.setCenter(arrowMarker.position)
-        mapView.controller.setZoom(18.0)
-
+        animateArrowTo(currentGeoPoint)
+        animateMapTo(currentGeoPoint, bearing)
+        checkInstructionTrigger(currentGeoPoint)
         lastPosition = position
-        mapView.invalidate()
     }
 
-    private var lastCenter: GeoPoint? = null
-
-    private fun smoothCenterTo(newPosition: GeoPoint) {
+    /**
+     * animateArrowTo
+     * @info : Animates arrow position
+     * @param newPosition : GeoPoint
+     * @param duration : Long = 1500L
+     */
+    private fun animateArrowTo(newPosition: GeoPoint, duration: Long = 1500L) {
         val old = lastCenter ?: newPosition
-        val lat = old.latitude + (newPosition.latitude - old.latitude) * 0.1
-        val lon = old.longitude + (newPosition.longitude - old.longitude) * 0.1
-        val interpolated = GeoPoint(lat, lon)
 
-        lastCenter = interpolated
-        mapView.controller.setCenter(interpolated)
+        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            this.duration = duration
+
+            addUpdateListener { animation ->
+                val fraction = animation.animatedFraction
+                val lat = old.latitude + (newPosition.latitude - old.latitude) * fraction
+                val lon = old.longitude + (newPosition.longitude - old.longitude) * fraction
+                val interpolated = GeoPoint(lat, lon)
+
+                //arrowMarker.rotation = 0f
+                arrowMarker.position = interpolated
+                arrowMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                mapView.invalidate()
+            }
+
+        }
+
+        animator.start()
+
+    }
+
+    /**
+     * animateMapTo
+     * @info : Animates map position
+     * @param newPosition : GeoPoint
+     * @param newBearing : Float
+     * @param duration : Long = 1300L
+     */
+    private fun animateMapTo(newPosition: GeoPoint, newBearing: Float, duration: Long = 1300L) {
+        val old = lastCenter ?: newPosition
+
+        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            this.duration = duration
+
+            addUpdateListener { animation ->
+                val fraction = animation.animatedFraction
+                val lat = old.latitude + (newPosition.latitude - old.latitude) * fraction
+                val lon = old.longitude + (newPosition.longitude - old.longitude) * fraction
+                val interpolated = GeoPoint(lat, lon)
+
+                mapView.mapOrientation = newBearing
+
+                lastCenter = interpolated
+                mapView.controller.setCenter(interpolated)
+                mapView.invalidate()
+            }
+        }
+        animator.start()
     }
 
 
-    var currentInstructionIndex = 0
-    private var instructionAffichee = false
-
+    /**
+     * checkInstructionTrigger
+     * @info : Updates navigation instruction
+     * @param currentLocation : GeoPoint
+     */
     private fun checkInstructionTrigger(currentLocation: GeoPoint) {
 
         if (currentInstructionIndex >= instructions.size) return
@@ -567,20 +616,24 @@ class MainActivity : AppCompatActivity() {
 
         if (distanceToInstruction < 80 && currentInstructionIndex < instructions.size - 1) {
             showInstruction(nextInstruction)
-            instructionAffichee = true
         }
-
     }
 
+    /**
+     * showInstruction
+     * @info : Updates ImageView with instruction and arrow direction
+     * @param nextInstruction : NavigationInstruction (message, location, arrow)
+     */
     private fun showInstruction(nextInstruction: NavigationInstruction) {
-        // Mettre à jour l'ImageView avec l'image de la flèche
         arrowImageView.setImageDrawable(nextInstruction.arrow)
-
         tvInstruction.text = nextInstruction.message
         tvInstruction.visibility = View.VISIBLE
     }
 
-    /** Vérifie et demande les permissions nécessaires **/
+    /**
+     * requestPermissionsIfNeeded
+     * @info : Request permissions if needed
+     */
     private fun requestPermissionsIfNeeded(onGranted: () -> Unit) {
         val perms = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
         val launcher = registerForActivityResult(
