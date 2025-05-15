@@ -54,6 +54,6 @@ Pour mieux comprendre l’architecture et les choix métiers, consultez les fich
 
 
 ## ✏️ ESP32 Project
-<img src="images/Bike.png" width="200"/>
-<img src="images/MotoBike.png" width="200"/>
+<img src="images/Bike.png" width="400"/>
+<img src="images/MotoBike.png" width="400"/>
 
