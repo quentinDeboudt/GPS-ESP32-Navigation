@@ -4,11 +4,11 @@
 
 Ce projet s'inspire du concept de l'appareil **Beeline**, un système de navigation minimaliste dédié aux deux-roues, reconnu pour son design épuré et son efficacité. Toutefois, Beeline reste un produit coûteux et fermé, ce qui limite son accessibilité et sa personnalisation.
 
+## 🎯 Pourquoi ce projet ?
+
 Ce projet vise à proposer une alternative **open-source, économique et personnalisable**, en affichant des informations de navigation GPS sur un petit écran (+ESP32).  
 
 L’objectif est de permettre aux conducteurs de **voiture, moto, vélo, trottinette..** de suivre leur itinéraire de manière simple et intuitive, **sans avoir à consulter leur téléphone**.
-
-## 🎯 Pourquoi ce projet ?
 
 Les informations affichées incluront :
 - Les instructions de navigation:
@@ -56,3 +56,4 @@ Pour mieux comprendre l’architecture et les choix métiers, consultez les fich
 ## ✏️ ESP32 Project
 <img src="images/Bike.png" width="200"/>
 <img src="images/MotoBike.png" width="200"/>
+
