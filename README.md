@@ -1,8 +1,13 @@
-# ESP32-Véhicule-Navigation
+# Documentation du Projet IoT : ESP-32 avec Affichage GPS.
+
+1. Introduction
 
 ## 💡 Inspiration
 
-Ce projet s'inspire du concept de l'appareil **Beeline**, un système de navigation minimaliste dédié aux deux-roues, reconnu pour son design épuré et son efficacité. Toutefois, Beeline reste un produit coûteux et fermé, ce qui limite son accessibilité et sa personnalisation.
+Ce projet s'inspire du concept de l'appareil [Beeline](https://beeline.co/pages/beeline-moto), un 
+système de navigation minimaliste dédié aux deux-roues, reconnu pour son design épuré et son 
+efficacité. Toutefois, Beeline reste un produit coûteux et fermé, ce qui limite son accessibilité 
+et sa personnalisation.
 
 ## 🎯 Pourquoi ce projet ?
 
@@ -28,6 +33,7 @@ Pour mieux comprendre l’architecture et les choix métiers, consultez les fich
 - [Roadmap de recherche (pistes & orientations)](documentation/01_research_roadmap.md)
 - [Solutions existantes comparées](documentation/02_existing_solutions.md)
 - [Solutions envisagées (comparatif)](documentation/03_proposed_solutions.md)
+
 
 
 ## ✏️ ESP32 Project – Système embarqué (vue éclatée)
