@@ -1,20 +1,11 @@
 # Solution envisagée ?
 
-## 1. Projet : Création d'une application mobile + montre ESP32
+## Développement d'une Application de navigation GPS personnalisée (solution retenue)
 
-### Option 1 : Réutilisation d'applications existantes
+Création d'un application Android (joue le rôle de planificateur d’itinéraire) ainssi que l'uttilisation
+d'une carte ESP32, munie d’un écran rectangulaire intégré (assure le guidage en temps réel).
 
-La solution la plus simple consisterait à réutiliser des applications déjà développées, capables **d’écouter les notifications du téléphone**.  
-Cependant, plusieurs limitations rendent cette option peu adaptée :
-
-- Ces applications **ne couvrent pas l'ensemble du besoin initial** (par exemple, la prise en charge simultanée des notifications de **Google Maps** et **Waze**).
-- Elles **ne sont pas libres de modification**, ce qui empêche toute personnalisation ou adaptation du code pour répondre aux exigences spécifiques du projet.
-
-
-### Option 2 : Développement d'une Application de navigation GPS personnalisée (solution retenue)
-
-L'**application de navigation GPS** Android permet :
-
+L'**application de navigation GPS** Android permet:
 
 - [x] Saisie de la destination finale et génération d’un tracé vectoriel (via **GraphHopper**).
 - [x] Clic sur **“Démarrer la navigation”** pour lancer le guidage.
@@ -25,12 +16,10 @@ L'**application de navigation GPS** Android permet :
 - [ ] **Estimation du temps de trajet**
 - [ ] **Estimation de l’heure d’arrivée (ETA)**
 
-
 - [ ] Pré-envoi des **tuiles cartographiques** et du **tracé vectoriel** complet vers l’ESP-32 **avant le démarrage**
 - [ ] Gestion du protocole **BLE** (Bluetooth Low Energy) sur l’ESP-32 pour réception des données
 - [ ] Adaptation de l’affichage sur l'écran ESP-32 (flèches + distance + carte)
 - [ ] **Enregistrement d’itinéraires favoris**
-
 
 ### Connexion à l’ESP-32:
 

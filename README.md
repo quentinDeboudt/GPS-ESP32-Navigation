@@ -38,23 +38,22 @@
 - [Solutions envisagées (comparatif)](documentation/03_proposed_solutions.md)
 
 
-
-## ✏️ ESP32 Project – Système embarqué (vue éclatée)
-
-<img src="images/Exploded_view_drawing.png" width="500"/>
+## ✏️ ESP32 Project – Système embarqué. (vue éclatée)
 
 **Vue éclatée de l’appareil**:
 
 - **Coque**: Impression 3D en PLA.
 - **Verre protecteur**: Offre une protection supplémentaire contre:
   - les rayures liées à l’usage quotidien,
-  - les chocs légers, 
+  - les chocs légers,
   - les projections d’eau légères, comme des gouttes de pluie occasionnelles.
 - **ESP32/Display**: Microcontrôleur avec écran intégré.
 - **Batterie LiPo 3.7V**: Alimentation rechargeable, placée en fond de boîtier.
+- 
+<img src="images/Exploded_view_drawing.png" width="400"/>
 
-
-## ✏️ ESP32 Project – Aperçus de l'interface utilisateur (Mockup)
+c
+## ✏️ ESP32 Project – Aperçus de l'interface utilisateur. (Mockup)
 1. Connexion au téléphone via Bluetooth.
 2. Écran de préchargement des données.
 3. Vue de la navigation.
@@ -62,11 +61,13 @@
 <img src="images/Interface_ESP_Display.png" width="500"/>
 
 
-## ✏️ ESP32 Project - Aperçu en conditions réelles
+## ✏️ ESP32 Project - Aperçu en conditions réelles.
 <img src="images/Bike.png" width="400"/>
 <img src="images/MotoBike.png" width="400"/>
 
 
-## ✏️ ESP32 Project - Rendu visuel lors de l’utilisation de l'application
+## ✏️ ESP32 Project - Rendu visuel lors de l’utilisation de l'application.
 <img src="images/01_Map_ListScreen.png" width="700"/>
 
+## ✏️ ESP32 Project - Transmission de données GPS temps réel.
+<img src="images/phone-esp32.png" width="700"/>
