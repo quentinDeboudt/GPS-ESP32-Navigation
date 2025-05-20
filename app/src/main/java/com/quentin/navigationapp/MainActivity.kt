@@ -2,11 +2,8 @@ package com.quentin.navigationapp
 
 import android.Manifest
 import android.animation.ValueAnimator
-import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Point
 import android.graphics.drawable.Drawable
 import android.hardware.SensorManager
 import android.location.Geocoder
@@ -71,6 +68,8 @@ class MainActivity : AppCompatActivity() {
     private var arrowIcon: Int = R.drawable.ic_arrow_motorbike
     private var totalMinutes: String = "00:00"
     private var totalKilometers: String = "0"
+    private var vehicle: String = "car"
+    private var weightings: String = "fastest"
 
     private lateinit var instructions: List<NavigationInstruction>
     private var lastPosition: Location? = null
@@ -170,7 +169,7 @@ class MainActivity : AppCompatActivity() {
 
         // Spinner config (bike? motorcycle? ...)
         val spinner = findViewById<Spinner>(R.id.transport_spinner)
-        val icons = listOf(R.drawable.ic_motorbike, R.drawable.ic_bike, R.drawable.ic_car)
+        val icons = listOf(R.drawable.ic_motorbike, R.drawable.ic_scooter, R.drawable.ic_bike, R.drawable.ic_car)
 
         val adapter = object : ArrayAdapter<Int>(this, R.layout.item_icon_only_spinner, icons) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
@@ -197,15 +196,22 @@ class MainActivity : AppCompatActivity() {
                     R.drawable.ic_motorbike -> {
                         arrowIcon = R.drawable.ic_arrow_motorbike
                         newPosition = 0
+                        vehicle = "car"
+                    }
+                    R.drawable.ic_scooter -> {
+                        arrowIcon = R.drawable.ic_arrow_motorbike
+                        newPosition = 0
+                        vehicle = "scooter"
                     }
                     R.drawable.ic_bike -> {
                         arrowIcon = R.drawable.ic_bike_arrow
                         newPosition = 1
-
+                        vehicle = "bike"
                     }
                     R.drawable.ic_car -> {
                         arrowIcon = R.drawable.ic_car_arrow
                         newPosition = 2
+                        vehicle = "car"
                     }
 
                 }
@@ -222,16 +228,22 @@ class MainActivity : AppCompatActivity() {
 
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 if (destinationAddress.isNotEmpty()) {
+                    mapView.overlays.clear()
+                    routePoints = emptyList()
+                    instructions = emptyList()
+                    tvDestination.text = ""
                     getCoordinatesFromAddress(destinationAddress)
 
                     // Afficher bouton "demarrer la navigation"
                     layoutControl.visibility = View.VISIBLE
                     btnStartNavigation.visibility = View.VISIBLE
-                    layoutFilter.visibility = View.GONE
+                    //layoutFilter.visibility = View.GONE
 
-                    val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
+                    /*val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
                     params.topMargin = 70 * resources.displayMetrics.density.toInt() // 50dp
                     mapView.layoutParams = params
+
+                     */
 
                 } else {
                     Toast.makeText(this, "Veuillez entrer une destination", Toast.LENGTH_SHORT).show()
@@ -240,21 +252,22 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Lancement de la navigation au clic
+        var navigationJob: Job? = null
+
         requestPermissionsIfNeeded {
             findViewById<Button>(R.id.btnStartNavigation).setOnClickListener {
-                lifecycleScope.launch {
+                navigationJob = lifecycleScope.launch {
                     locationFlow.collect {
                         updateArrowOverlay(it)
 
                         val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
                         params.topMargin = 0
-                        mapView.controller.setZoom(18.0)
                         mapView.layoutParams = params
+                        mapView.controller.setZoom(18.0)
 
                         val tvInstructionParams = layoutInstruction.layoutParams as ViewGroup.MarginLayoutParams
                         tvInstructionParams.topMargin = 10 * resources.displayMetrics.density.toInt()
                         layoutInstruction.layoutParams = tvInstructionParams
-
 
                         // afficher l'instruction
                         layoutInstruction.visibility = View.VISIBLE
@@ -264,7 +277,6 @@ class MainActivity : AppCompatActivity() {
                         btnStartNavigation.visibility = View.GONE
                         // Afficher bouton "Arréter la navigation"
                         btnFinishNavigation.visibility = View.VISIBLE
-
                     }
                 }
             }
@@ -272,6 +284,11 @@ class MainActivity : AppCompatActivity() {
 
         // Arret de la navigation au clic
         findViewById<Button>(R.id.btnFinishNavigation).setOnClickListener {
+
+            navigationJob?.cancel()
+            navigationJob = null
+
+            displayArrowNavigation(currentPosition)
 
             val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
             params.topMargin = 150 * resources.displayMetrics.density.toInt() // 150dp
@@ -284,19 +301,13 @@ class MainActivity : AppCompatActivity() {
             layoutNavigationInput.visibility = View.VISIBLE
             // Supprimer l'instruction
             tvInstruction.visibility = View.GONE
+            layoutInstruction.visibility = View.GONE
             // Afficher layout de recherche
             layoutNavigationInput.visibility = View.VISIBLE
             // Afficher bouton "demarrer la navigation"
             btnStartNavigation.visibility = View.VISIBLE
             // Afficher les filtre
             layoutFilter.visibility = View.VISIBLE
-
-            var locationJob: Job? = null
-            locationJob?.cancel()
-
-            routePoints = emptyList()
-            instructions = emptyList()
-            tvDestination.text = ""
         }
     }
 
@@ -342,7 +353,7 @@ class MainActivity : AppCompatActivity() {
                 val navInstructions = mutableListOf<NavigationInstruction>()
 
                 // Appel à l'API
-                val responseTeste = navigationService.getRoute(currentLatLng, destinationLatLng)
+                val responseTeste = navigationService.getRoute(currentLatLng, destinationLatLng, vehicle, weightings)
                 val ghResponse: Path? = responseTeste.paths.firstOrNull()
 
                 if (ghResponse != null) {
@@ -528,18 +539,20 @@ class MainActivity : AppCompatActivity() {
      * @param location : current position
      */
     private fun displayArrowNavigation(location: GeoPoint) {
-       if (::mapView.isInitialized && !::arrowMarker.isInitialized) {
-
-           arrowMarker = Marker(mapView).apply {
-               icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_dafault_arrow)
-               setAnchor(Marker.ANCHOR_TOP, Marker.ANCHOR_TOP)
-           }
-
-           mapView.overlays.add(arrowMarker)
-           arrowMarker.position = location
-           mapView.controller.setCenter(location)
+        if (::mapView.isInitialized && ::arrowMarker.isInitialized) {
+           mapView.overlays.remove(arrowMarker)
            mapView.invalidate()
         }
+
+        arrowMarker = Marker(mapView).apply {
+            icon = ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_dafault_arrow)
+            setAnchor(Marker.ANCHOR_TOP, Marker.ANCHOR_TOP)
+        }
+
+        mapView.overlays.add(arrowMarker)
+        arrowMarker.position = location
+        mapView.controller.setCenter(location)
+        mapView.invalidate()
     }
 
     /**
@@ -580,7 +593,7 @@ class MainActivity : AppCompatActivity() {
                 val lon = old.longitude + (newPosition.longitude - old.longitude) * fraction
                 val interpolated = GeoPoint(lat, lon)
 
-                //arrowMarker.rotation = 0f
+
                 arrowMarker.position = interpolated
                 arrowMarker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                 mapView.invalidate()

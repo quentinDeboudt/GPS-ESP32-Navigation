@@ -21,7 +21,8 @@ interface OpenRouteServiceAPI {
     suspend fun getRoute(
         @Query("point") point1: String,
         @Query("point") point2: String,
-        @Query("vehicle") vehicle: String = "car",
+        @Query("vehicle") vehicle: String,
+        @Query("weighting") weighting: String,
         @Query("locale") locale: String = "fr",
         @Query("instructions") instructions: Boolean = true,
         @Query("calc_points") calcPoints: Boolean = true,

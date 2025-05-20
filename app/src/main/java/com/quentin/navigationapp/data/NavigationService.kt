@@ -40,17 +40,11 @@ class NavigationService {
 
     val apiGraphhopper = retrofitGraphhopper.create(OpenRouteServiceAPI::class.java)
 
-    suspend fun getRoute(start: LatLng, end: LatLng): GraphHopperResponse {
-
-        Log.d("OtherAPI", "Dans getRoute")
-
+    suspend fun getRoute(start: LatLng, end: LatLng, vehicle: String, weighting: String): GraphHopperResponse {
         val point1 = "${start.latitude}, ${start.longitude}"
         val point2 = "${end.latitude}, ${end.longitude}"
 
-        Log.d("OtherAPI", "Envoyer: $point1, $point2,\"car\", \"fr\", true, true,")
-
-        return apiGraphhopper.getRoute(point1, point2, "car", "fr", true, true, false, BuildConfig.GH_API_KEY)
-
+        return apiGraphhopper.getRoute(point1, point2, vehicle, "fr", weighting,true, true, false, BuildConfig.GH_API_KEY)
     }
 }
 
