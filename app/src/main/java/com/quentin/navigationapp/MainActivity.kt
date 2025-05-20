@@ -2,8 +2,11 @@ package com.quentin.navigationapp
 
 import android.Manifest
 import android.animation.ValueAnimator
+import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Point
 import android.graphics.drawable.Drawable
 import android.hardware.SensorManager
 import android.location.Geocoder
@@ -26,6 +29,7 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import android.location.Location
+import android.os.Handler
 import android.util.Log
 import android.view.View
 import android.widget.Button
@@ -46,7 +50,7 @@ import android.widget.LinearLayout
 import android.widget.Spinner
 import com.quentin.navigationapp.network.Path
 import kotlinx.coroutines.Job
-import kotlin.math.round
+import org.osmdroid.util.BoundingBox
 
 class MainActivity : AppCompatActivity() {
 
@@ -65,6 +69,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var navigationTime: TextView
     private lateinit var navigationDistance: TextView
     private var arrowIcon: Int = R.drawable.ic_arrow_motorbike
+    private var totalMinutes: String = "00:00"
+    private var totalKilometers: String = "0"
 
     private lateinit var instructions: List<NavigationInstruction>
     private var lastPosition: Location? = null
@@ -242,6 +248,7 @@ class MainActivity : AppCompatActivity() {
 
                         val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
                         params.topMargin = 0
+                        mapView.controller.setZoom(18.0)
                         mapView.layoutParams = params
 
                         val tvInstructionParams = layoutInstruction.layoutParams as ViewGroup.MarginLayoutParams
@@ -331,7 +338,6 @@ class MainActivity : AppCompatActivity() {
      */
     private fun getDirections(currentLatLng: LatLng, destinationLatLng: LatLng) {
         CoroutineScope(Dispatchers.IO).launch {
-
             try {
                 val navInstructions = mutableListOf<NavigationInstruction>()
 
@@ -343,8 +349,9 @@ class MainActivity : AppCompatActivity() {
                     val points = ghResponse.points
                     val coordinates = points.coordinates
 
-                    val totalMinutes = formatTime(ghResponse.time)
-                    val totalKilometers = ghResponse.distance / 1000.0
+                    totalMinutes = formatTime(ghResponse.time)
+                    val distanceKm = ghResponse.distance / 1000.0
+                    totalKilometers = String.format("%.1f", distanceKm) + " km"
 
 
                     val coordinatesGeoPoints: List<GeoPoint> = coordinates.map { (lon, lat) ->
@@ -465,6 +472,19 @@ class MainActivity : AppCompatActivity() {
 
         routePoints = coordinates.map { GeoPoint(it.latitude, it.longitude) }
 
+        // 2. Calculer une BoundingBox autour de tous les points
+        val boundingBox = BoundingBox.fromGeoPointsSafe(routePoints)
+
+        // 3. Appliquer le zoom pour voir toute la BoundingBox
+        Handler(Looper.getMainLooper()).postDelayed({
+            mapView.zoomToBoundingBox(boundingBox, true, 100)
+
+            navigationTime.text = totalMinutes
+            navigationDistance.text = totalKilometers
+
+        }, 300)
+
+
         val roadOverlay = Polyline()
         roadOverlay.setPoints(routePoints)
         roadOverlay.color = Color.BLACK
@@ -493,6 +513,8 @@ class MainActivity : AppCompatActivity() {
      */
     private fun configureMap(location: GeoPoint) {
         mapView.setTileSource(TileSourceFactory.MAPNIK)
+        mapView.setMultiTouchControls(true)
+        mapView.setBuiltInZoomControls(false)
         mapView.controller.setZoom(18.0)
         mapView.controller.setCenter(location)
         mapView.invalidate()
