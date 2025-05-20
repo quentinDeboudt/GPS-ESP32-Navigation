@@ -168,10 +168,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Spinner config (bike? motorcycle? ...)
-        val spinner = findViewById<Spinner>(R.id.transport_spinner)
-        val icons = listOf(R.drawable.ic_motorbike, R.drawable.ic_scooter, R.drawable.ic_bike, R.drawable.ic_car)
+        val transportSpinner = findViewById<Spinner>(R.id.transport_spinner)
+        val iconsTransport = listOf(R.drawable.ic_motorbike, R.drawable.ic_scooter, R.drawable.ic_bike, R.drawable.ic_car)
 
-        val adapter = object : ArrayAdapter<Int>(this, R.layout.item_icon_only_spinner, icons) {
+        val transportAdapter = object : ArrayAdapter<Int>(this, R.layout.item_icon_only_spinner, iconsTransport) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val imageView = LayoutInflater.from(context).inflate(R.layout.item_icon_only_spinner, parent, false) as ImageView
                 imageView.setImageResource(getItem(position)!!)
@@ -184,12 +184,31 @@ class MainActivity : AppCompatActivity() {
                 return imageView
             }
         }
-        spinner.adapter = adapter
+        transportSpinner.adapter = transportAdapter
+
+        // Spinner config (speed? slow? ...)
+        val speedSpinner = findViewById<Spinner>(R.id.speed_spinner)
+        val iconsSpeed = listOf(R.drawable.ic_speed_logo, R.drawable.ic_slow_logo)
+
+        val speedAdapter = object : ArrayAdapter<Int>(this, R.layout.item_icon_speed_spinner, iconsSpeed) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val imageView = LayoutInflater.from(context).inflate(R.layout.item_icon_speed_spinner, parent, false) as ImageView
+                imageView.setImageResource(getItem(position)!!)
+                return imageView
+            }
+
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val imageView = LayoutInflater.from(context).inflate(R.layout.item_icon_speed_spinner, parent, false) as ImageView
+                imageView.setImageResource(getItem(position)!!)
+                return imageView
+            }
+        }
+        speedSpinner.adapter = speedAdapter
 
 
-        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+        transportSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
-                val selectedIcon = icons[position]
+                val selectedIcon = iconsTransport[position]
                 var newPosition: Int = -1
 
                 when (selectedIcon) {
@@ -199,7 +218,7 @@ class MainActivity : AppCompatActivity() {
                         vehicle = "car"
                     }
                     R.drawable.ic_scooter -> {
-                        arrowIcon = R.drawable.ic_arrow_motorbike
+                        arrowIcon = R.drawable.ic_arrow_scooter
                         newPosition = 0
                         vehicle = "scooter"
                     }
@@ -217,8 +236,29 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            override fun onNothingSelected(parent: AdapterView<*>) {
-                // Optionnel
+            override fun onNothingSelected(parent: AdapterView<*>?) {
+                TODO("Not yet implemented")
+            }
+        }
+
+        speedSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                val selectedIcon = iconsSpeed[position]
+                var newPosition: Int = -1
+
+                when (selectedIcon) {
+                    R.drawable.ic_speed_logo -> {
+                        newPosition = 0
+                        weightings = "fastest"
+                    }
+                    R.drawable.ic_slow_logo -> {
+                        newPosition = 0
+                        weightings = "eco"
+                    }
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {
+                TODO("Not yet implemented")
             }
         }
 
