@@ -11,7 +11,7 @@ L'**application de navigation GPS** Android permet:
 - [x] Clic sur **“Démarrer la navigation”** pour lancer le guidage.
 - [x] Récupération en temps réel de la position GPS de l’utilisateur.
 - [x] Affichage des instructions au fur et à mesure (ex. : “dans 100 m, tourner à droite” + flèches directionnelles…).
-- [ ] Recalcul dynamique d’itinéraire et mise à jour en temps réel côté ESP-32
+- [x] Recalcul dynamique d’itinéraire et mise à jour en temps réel côté ESP-32
 - [x] **Affichage du nombre total de kilomètres à parcourir**
 - [x] **Estimation du temps de trajet**
 - [x] Changer le type de véhicule (vélo, scooter, moto, voiture)

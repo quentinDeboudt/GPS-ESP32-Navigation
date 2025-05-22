@@ -536,7 +536,6 @@ class MainActivity : AppCompatActivity() {
         return minDist > maxDistanceMeters
     }
 
-
     /**
      * RouteRecalculation
      * @info: Dynamic route recalculation
