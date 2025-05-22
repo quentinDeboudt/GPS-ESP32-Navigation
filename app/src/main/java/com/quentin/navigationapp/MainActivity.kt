@@ -2,6 +2,7 @@ package com.quentin.navigationapp
 
 import android.Manifest
 import android.animation.ValueAnimator
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.Drawable
@@ -42,12 +43,16 @@ import org.osmdroid.views.overlay.Polyline
 import android.widget.ArrayAdapter
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.widget.AdapterView
 import android.widget.LinearLayout
 import android.widget.Spinner
 import com.quentin.navigationapp.network.Path
 import kotlinx.coroutines.Job
 import org.osmdroid.util.BoundingBox
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
 
 class MainActivity : AppCompatActivity() {
 
@@ -85,6 +90,10 @@ class MainActivity : AppCompatActivity() {
     private var arrowIcon: Int = R.drawable.ic_arrow_motorbike
     private var vehicle: String = "car"
     private var weightings: String = "fastest"
+    private var lastVectorPath: MutableList<GeoPoint> = mutableListOf()
+    private var traveledPathPolyline: Polyline? = null
+    private var isNavigating = false
+    private var currentRoutePolyline: Polyline? = null
 
     // Dispatcher I/O pour les Flows
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
@@ -174,7 +183,7 @@ class MainActivity : AppCompatActivity() {
 
         // Spinner config (bike? motorcycle? ...)
         val transportSpinner = findViewById<Spinner>(R.id.transport_spinner)
-        val iconsTransport = listOf(R.drawable.ic_motorbike, R.drawable.ic_scooter, R.drawable.ic_bike, R.drawable.ic_car)
+        val iconsTransport = listOf(R.drawable.ic_motorbike, R.drawable.ic_scooter, R.drawable.ic_motocross, R.drawable.ic_electric_scooter, R.drawable.ic_car)
 
         val transportAdapter = object : ArrayAdapter<Int>(this, R.layout.item_icon_only_spinner, iconsTransport) {
             override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
@@ -226,9 +235,14 @@ class MainActivity : AppCompatActivity() {
                         newPosition = 0
                         vehicle = "scooter"
                     }
-                    R.drawable.ic_bike -> {
+                    R.drawable.ic_motocross -> {
                         arrowIcon = R.drawable.ic_bike_arrow
                         newPosition = 1
+                        vehicle = "mtb"
+                    }
+                    R.drawable.ic_electric_scooter -> {
+                        arrowIcon = R.drawable.ic_arrow_scooter
+                        newPosition = 0
                         vehicle = "bike"
                     }
                     R.drawable.ic_car -> {
@@ -266,10 +280,27 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+
         //Recherche de l'itineraire
         findViewById<Button>(R.id.searchNavigationButton).setOnClickListener {
 
             getCurrentPosition()
+
+            // Réinitialise la trace effective
+            lastVectorPath.clear()
+            // Retire l’ancien tracé “véhicule passé”
+            traveledPathPolyline?.let {
+                mapView.overlays.remove(it)
+                traveledPathPolyline = null
+            }
+            mapView.invalidate()
+
+            // Masquer le clavier proprement
+            val imm = ContextCompat.getSystemService(this, InputMethodManager::class.java)
+            imm?.hideSoftInputFromWindow(tvDestination.windowToken, 0)
+
+            tvDestination.clearFocus()
+
             val destinationAddress = tvDestination.text.toString()
 
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
@@ -296,15 +327,19 @@ class MainActivity : AppCompatActivity() {
             findViewById<Button>(R.id.btnStartNavigation).setOnClickListener {
 
                 navigationStartView()
+                navigationisStarted(true)
 
                 navigationJob = lifecycleScope.launch {
                     locationFlow.collect {
 
+                        currentPosition = GeoPoint(it.latitude, it.longitude)
+
                         updateArrowOverlay(it)
 
-                        if (isFarFromRoute(currentPosition, routePoints)) {
+                        if (isFarFromRoute(currentPosition, routePoints, maxDistanceMeters = 100.0)) {
                             routeRecalculation()
                         }
+                        displayLastPathPolyline()
                     }
                 }
             }
@@ -313,37 +348,16 @@ class MainActivity : AppCompatActivity() {
         // Arret de la navigation au clic
         findViewById<Button>(R.id.btnFinishNavigation).setOnClickListener {
 
+            mapView.overlays.remove(arrowMarker)
+
+            navigationisStarted(false)
             navigationJob?.cancel()
             navigationJob = null
 
             displayArrowNavigation(currentPosition)
 
             navigationStopView()
-
         }
-    }
-
-
-    private fun navigationStopView() {
-
-        val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
-        params.topMargin = 150 * resources.displayMetrics.density.toInt() // 150dp
-        mapView.layoutParams = params
-
-        // Supprimer bouton "Arreter la navigation"
-        btnFinishNavigation.visibility = View.GONE
-
-        // Afficher layout de recherche
-        layoutNavigationInput.visibility = View.VISIBLE
-        // Supprimer l'instruction
-        tvInstruction.visibility = View.GONE
-        layoutInstruction.visibility = View.GONE
-        // Afficher layout de recherche
-        layoutNavigationInput.visibility = View.VISIBLE
-        // Afficher bouton "demarrer la navigation"
-        btnStartNavigation.visibility = View.VISIBLE
-        // Afficher les filtre
-        layoutFilter.visibility = View.VISIBLE
     }
 
     /**
@@ -357,7 +371,7 @@ class MainActivity : AppCompatActivity() {
         mapView.controller.setZoom(18.0)
 
         val tvInstructionParams = layoutInstruction.layoutParams as ViewGroup.MarginLayoutParams
-        tvInstructionParams.topMargin = 10 * resources.displayMetrics.density.toInt()
+        tvInstructionParams.topMargin = 15 * resources.displayMetrics.density.toInt()
         layoutInstruction.layoutParams = tvInstructionParams
 
         // afficher l'instruction
@@ -368,6 +382,41 @@ class MainActivity : AppCompatActivity() {
         btnStartNavigation.visibility = View.GONE
         // Afficher bouton "Arréter la navigation"
         btnFinishNavigation.visibility = View.VISIBLE
+    }
+
+    private fun navigationStopView() {
+
+        val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
+        params.topMargin = 200 * resources.displayMetrics.density.toInt() // 150dp
+        mapView.layoutParams = params
+
+        // Supprimer bouton "Arreter la navigation"
+        btnFinishNavigation.visibility = View.GONE
+        // Afficher layout de recherche
+        layoutNavigationInput.visibility = View.VISIBLE
+
+        layoutInstruction.visibility = View.GONE
+        // Afficher layout de recherche
+        layoutNavigationInput.visibility = View.VISIBLE
+        // Afficher bouton "demarrer la navigation"
+        btnStartNavigation.visibility = View.VISIBLE
+        // Afficher les filtre
+        layoutFilter.visibility = View.VISIBLE
+    }
+
+    private fun displayLastPathPolyline(){
+        lastVectorPath.add(currentPosition)
+
+        if (traveledPathPolyline == null) {
+            traveledPathPolyline = Polyline().apply {
+                color = Color.BLACK
+                width = 10f
+                mapView.overlays.add(this)
+            }
+        }
+        traveledPathPolyline!!.setPoints(lastVectorPath)
+
+        mapView.invalidate()
     }
 
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
@@ -401,12 +450,11 @@ class MainActivity : AppCompatActivity() {
             if (finishAddress.isNotEmpty() == true) {
                 val location = finishAddress[0]
                 val destinationLatLng = LatLng(location?.latitude ?: 0.00 , location?.longitude ?: 0.00)
-                val currentLocationLatLng = LatLng(currentPosition.latitude, currentPosition.longitude)
 
                 currentDestination = GeoPoint(destinationLatLng.latitude, destinationLatLng.longitude)
 
                 displayAddress(finishAddress[0].getAddressLine(0).toString())
-                getDirections(currentLocationLatLng, destinationLatLng)
+                getDirections(destinationLatLng)
             } else {
                 Toast.makeText(this, "Adresse non trouvée", Toast.LENGTH_SHORT).show()
             }
@@ -417,34 +465,85 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * isFarFromRoute
-     * @info: Dynamic route recalculation
+     * Calcule la distance (en mètres) du point 'current' au segment [start–end].
+     * La projection est faite en coordonnées métriques pour éviter l’imprécision des degrés.
      */
-    fun isFarFromRoute(current: GeoPoint, routePoints: List<GeoPoint>, maxDistanceMeters: Double = 30.0): Boolean {
+    private fun distanceToSegment(
+        current: GeoPoint,
+        start: GeoPoint,
+        end: GeoPoint
+    ): Double {
+        val R = 6_371_000.0  // Rayon moyen de la Terre en mètres
 
-        val minDistance = routePoints.minOf { point ->
-            current.distanceToAsDouble(point)
+        // Convertis lat/lon en radians
+        val lat0 = Math.toRadians(current.latitude)
+        val lon0 = Math.toRadians(current.longitude)
+        val lat1 = Math.toRadians(start.latitude)
+        val lon1 = Math.toRadians(start.longitude)
+        val lat2 = Math.toRadians(end.latitude)
+        val lon2 = Math.toRadians(end.longitude)
+
+        // Pour limiter l’erreur en longitude, on approche avec la latitude moyenne
+        val meanLat = (lat1 + lat2) / 2
+        val cosMeanLat = cos(meanLat)
+
+        // Coordonnées cartésiennes (approximation equirectangulaire)
+        val x0 = lon0 * cosMeanLat * R
+        val y0 = lat0 * R
+        val x1 = lon1 * cosMeanLat * R
+        val y1 = lat1 * R
+        val x2 = lon2 * cosMeanLat * R
+        val y2 = lat2 * R
+
+        val dx = x2 - x1
+        val dy = y2 - y1
+        if (dx == 0.0 && dy == 0.0) {
+            // Segment réduit à un point
+            return current.distanceToAsDouble(start)
         }
 
-        return minDistance > maxDistanceMeters
+        // Projection scalaire de (P−A) sur (B−A)
+        val t = ((x0 - x1) * dx + (y0 - y1) * dy) / (dx*dx + dy*dy)
+        val tClamped = min(1.0, max(0.0, t))
+
+        // Point projeté en métrique
+        val projX = x1 + tClamped * dx
+        val projY = y1 + tClamped * dy
+
+        // Distance euclidienne en mètre
+        val distX = x0 - projX
+        val distY = y0 - projY
+        return kotlin.math.hypot(distX, distY)
     }
+
+    /**
+     * Vérifie si la position est à plus de maxDistanceMeters
+     * de tous les segments du tracé.
+     */
+    private fun isFarFromRoute(
+        current: GeoPoint,
+        routePoints: List<GeoPoint>,
+        maxDistanceMeters: Double = 30.0
+    ): Boolean {
+        if (routePoints.size < 2) return true
+
+        // Calcule la plus petite distance aux segments successifs
+        val minDist = routePoints
+            .zipWithNext().minOfOrNull { (start, end) ->
+                distanceToSegment(current, start, end)
+            } ?: Double.MAX_VALUE
+
+        return minDist > maxDistanceMeters
+    }
+
 
     /**
      * RouteRecalculation
      * @info: Dynamic route recalculation
      */
     private fun routeRecalculation() {
-
-        //TODO: information ui reloading...
-
-        Log.d("GPS", "------------------------------------------")
-        Log.d("GPS", "Nouvelle intineraire !!!!!!!!!!!!!!!!!!")
-        Log.d("GPS", "------------------------------------------")
-
-        val currentPositionLatLng = LatLng(currentPosition.latitude, currentPosition.longitude)
         val currentDestinationLatLng = LatLng(currentDestination.latitude, currentDestination.longitude)
-
-        getDirections(currentPositionLatLng, currentDestinationLatLng)
+        getDirections(currentDestinationLatLng)
     }
 
     /**
@@ -454,10 +553,13 @@ class MainActivity : AppCompatActivity() {
      * @param destinationLatLng: LatLng
      * @call: displayVectorPath
      */
-    private fun getDirections(currentLatLng: LatLng, destinationLatLng: LatLng) {
+    private fun getDirections(destinationLatLng: LatLng) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                val currentLatLng = LatLng(currentPosition.latitude, currentPosition.longitude)
                 val navInstructions = mutableListOf<NavigationInstruction>()
+                totalMinutes = "0"
+                totalKilometers = "0"
 
                 // Appel à l'API
                 val responseTeste = navigationService.getRoute(currentLatLng, destinationLatLng, vehicle, weightings)
@@ -509,7 +611,7 @@ class MainActivity : AppCompatActivity() {
                     displayVectorPath(coordinatesGeoPoints)
                 }
             }catch (e: Exception) {
-                Log.e("OtherAPI", "Erreur: $e")
+                Log.e("API", "Erreur: $e")
             }
         }
     }
@@ -585,31 +687,49 @@ class MainActivity : AppCompatActivity() {
      * @info : Displays the navigation vector plot
      * @param coordinates : List<GeoPoint>
      */
-    private fun displayVectorPath(coordinates: List<GeoPoint>) {
+     fun displayVectorPath(coordinates: List<GeoPoint>) {
+        routePoints = coordinates.map { GeoPoint(it.latitude, it.longitude)}
 
-        routePoints = coordinates.map { GeoPoint(it.latitude, it.longitude) }
+        // SUPPRIMER l’ancien tracé s’il existe
+        currentRoutePolyline?.let { oldPolyline ->
+            mapView.overlays.remove(oldPolyline)
+            // si tu as des marqueurs associés, fais de même
+            mapView.invalidate()
+        }
 
-        // 2. Calculer une BoundingBox autour de tous les points
-        val boundingBox = BoundingBox.fromGeoPointsSafe(routePoints)
+        // CRÉER et AJOUTER le nouveau tracé
+        val newPolyline = Polyline().apply {
+            setPoints(routePoints)
+            width = 12f
+            color = Color.BLACK
+        }
+        mapView.overlays.add(newPolyline)
+        currentRoutePolyline = newPolyline
 
-        // 3. Appliquer le zoom pour voir toute la BoundingBox
-        Handler(Looper.getMainLooper()).postDelayed({
-            mapView.zoomToBoundingBox(boundingBox, true, 100)
+        if (!isNavigating) {
+            val bbox = BoundingBox.fromGeoPointsSafe(routePoints)
 
-            navigationTime.text = totalMinutes
-            navigationDistance.text = totalKilometers
+            Handler(Looper.getMainLooper()).postDelayed({
+                mapView.zoomToBoundingBox(bbox, true, 300)
 
-        }, 300)
+                navigationTime.text = totalMinutes
+                navigationDistance.text = totalKilometers
 
-
-        val roadOverlay = Polyline()
-        roadOverlay.setPoints(routePoints)
-        roadOverlay.color = Color.BLACK
-        roadOverlay.width = 17f
-        mapView.overlays.add(roadOverlay)
+            }, 300)
+        }
         mapView.overlays.add(arrowMarker)
         mapView.invalidate()
     }
+
+    // 2️⃣ Quand tu démarres / arrêtes la navigation, mets à jour ton flag :
+    fun navigationisStarted(value: Boolean) {
+        isNavigating = value
+
+
+
+    }
+
+
 
     /**
      * displayAddress
@@ -645,6 +765,8 @@ class MainActivity : AppCompatActivity() {
      * @param location : current position
      */
     private fun displayArrowNavigation(location: GeoPoint) {
+
+
         if (::mapView.isInitialized && ::arrowMarker.isInitialized) {
            mapView.overlays.remove(arrowMarker)
            mapView.invalidate()
