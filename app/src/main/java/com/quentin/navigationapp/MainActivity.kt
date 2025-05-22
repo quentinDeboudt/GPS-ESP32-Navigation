@@ -51,13 +51,12 @@ import org.osmdroid.util.BoundingBox
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var mapView: MapView
-    private lateinit var arrowMarker: Marker
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var sensorManager: SensorManager
     private val navigationService = NavigationService()
-    private lateinit var currentPosition: GeoPoint
-    private var routePoints: List<GeoPoint> = emptyList()
+
+    // Initialize navigation-related UI views
+    private lateinit var mapView: MapView
     private lateinit var tvInstruction: TextView
     private lateinit var arrowImageView: ImageView
     private lateinit var tvDestination: TextView
@@ -65,27 +64,42 @@ class MainActivity : AppCompatActivity() {
     private lateinit var layoutControl: LinearLayout
     private lateinit var navigationTime: TextView
     private lateinit var navigationDistance: TextView
-    private var arrowIcon: Int = R.drawable.ic_arrow_motorbike
+    private lateinit var btnStartNavigation: Button
+    private lateinit var layoutNavigationInput: LinearLayout
+    private lateinit var btnFinishNavigation: Button
+    private lateinit var layoutFilter: LinearLayout
+
+    //Navigation information:
     private var totalMinutes: String = "00:00"
     private var totalKilometers: String = "0"
+    private lateinit var instructions: List<NavigationInstruction>
+    private var lastPosition: Location? = null
+    private var lastDisplayedInstructionIndex: Int = -1
+    private var lastCenter: GeoPoint? = null
+
+    //Navigation variables:
+    private lateinit var currentPosition: GeoPoint
+    private lateinit var currentDestination: GeoPoint
+    private var routePoints: List<GeoPoint> = emptyList()
+    private lateinit var arrowMarker: Marker
+    private var arrowIcon: Int = R.drawable.ic_arrow_motorbike
     private var vehicle: String = "car"
     private var weightings: String = "fastest"
 
-    private lateinit var instructions: List<NavigationInstruction>
-    private var lastPosition: Location? = null
-    private var currentInstructionIndex = 0
-    private var lastCenter: GeoPoint? = null
+    // Dispatcher I/O pour les Flows
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 
+    // Gives the normalized angle difference between [-180, +180]
+    private fun normalizeBearingDiff(diff: Double): Double =
+        ((diff + 540) % 360) - 180
+
+    // Data class to store navigation instructions
     data class NavigationInstruction(
         val message: String,
         val location: GeoPoint,
         val arrow: Drawable? = null
     )
 
-    // Dispatcher I/O pour les Flows
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
-
-    // 1. Flow de positions GPS (1s intervalle) avec vérification explicite de permission
     private val locationFlow: Flow<Location> by lazy {
         callbackFlow {
             // Vérification de la permission avant de démarrer les mises à jour
@@ -127,6 +141,7 @@ class MainActivity : AppCompatActivity() {
      * @param savedInstanceState : Bundle
      * @call: configureMap
      */
+    @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -144,10 +159,10 @@ class MainActivity : AppCompatActivity() {
         layoutControl = findViewById<LinearLayout>(R.id.layout_control)
         navigationTime = findViewById<TextView>(R.id.navigation_time)
         navigationDistance = findViewById<TextView>(R.id.navigation_distance)
-        val btnStartNavigation = findViewById<Button>(R.id.btnStartNavigation)
-        val layoutNavigationInput = findViewById<LinearLayout>(R.id.layout_navigation_Input)
-        val btnFinishNavigation = findViewById<Button>(R.id.btnFinishNavigation)
-        val layoutFilter = findViewById<LinearLayout>(R.id.layout_filter)
+        btnStartNavigation = findViewById<Button>(R.id.btnStartNavigation)
+        layoutNavigationInput = findViewById<LinearLayout>(R.id.layout_navigation_Input)
+        btnFinishNavigation = findViewById<Button>(R.id.btnFinishNavigation)
+        layoutFilter = findViewById<LinearLayout>(R.id.layout_filter)
 
         // Hide buttons
         btnStartNavigation.visibility = View.GONE
@@ -155,17 +170,7 @@ class MainActivity : AppCompatActivity() {
         layoutInstruction.visibility = View.GONE
         layoutControl.visibility = View.GONE
 
-        // Retrieve location:
-        fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
-            if (location != null) {
-                val lat = location.latitude
-                val lon = location.longitude
-                configureMap(GeoPoint(lat, lon))
-                currentPosition = GeoPoint(lat, lon)
-            } else {
-                Toast.makeText(this, "Impossible d’obtenir la localisation", Toast.LENGTH_SHORT).show()
-            }
-        }
+        getCurrentPosition()
 
         // Spinner config (bike? motorcycle? ...)
         val transportSpinner = findViewById<Spinner>(R.id.transport_spinner)
@@ -204,7 +209,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         speedSpinner.adapter = speedAdapter
-
 
         transportSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
@@ -262,8 +266,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        //Recherche de l'itineraire avec la localisation
+        //Recherche de l'itineraire
         findViewById<Button>(R.id.searchNavigationButton).setOnClickListener {
+
+            getCurrentPosition()
             val destinationAddress = tvDestination.text.toString()
 
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
@@ -277,13 +283,6 @@ class MainActivity : AppCompatActivity() {
                     // Afficher bouton "demarrer la navigation"
                     layoutControl.visibility = View.VISIBLE
                     btnStartNavigation.visibility = View.VISIBLE
-                    //layoutFilter.visibility = View.GONE
-
-                    /*val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
-                    params.topMargin = 70 * resources.displayMetrics.density.toInt() // 50dp
-                    mapView.layoutParams = params
-
-                     */
 
                 } else {
                     Toast.makeText(this, "Veuillez entrer une destination", Toast.LENGTH_SHORT).show()
@@ -293,30 +292,19 @@ class MainActivity : AppCompatActivity() {
 
         // Lancement de la navigation au clic
         var navigationJob: Job? = null
-
         requestPermissionsIfNeeded {
             findViewById<Button>(R.id.btnStartNavigation).setOnClickListener {
+
+                navigationStartView()
+
                 navigationJob = lifecycleScope.launch {
                     locationFlow.collect {
+
                         updateArrowOverlay(it)
 
-                        val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
-                        params.topMargin = 0
-                        mapView.layoutParams = params
-                        mapView.controller.setZoom(18.0)
-
-                        val tvInstructionParams = layoutInstruction.layoutParams as ViewGroup.MarginLayoutParams
-                        tvInstructionParams.topMargin = 10 * resources.displayMetrics.density.toInt()
-                        layoutInstruction.layoutParams = tvInstructionParams
-
-                        // afficher l'instruction
-                        layoutInstruction.visibility = View.VISIBLE
-                        // Supprimer layout de recherche
-                        layoutNavigationInput.visibility = View.GONE
-                        // Supprimer bouton "demarrer la navigation"
-                        btnStartNavigation.visibility = View.GONE
-                        // Afficher bouton "Arréter la navigation"
-                        btnFinishNavigation.visibility = View.VISIBLE
+                        if (isFarFromRoute(currentPosition, routePoints)) {
+                            routeRecalculation()
+                        }
                     }
                 }
             }
@@ -330,24 +318,70 @@ class MainActivity : AppCompatActivity() {
 
             displayArrowNavigation(currentPosition)
 
-            val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
-            params.topMargin = 150 * resources.displayMetrics.density.toInt() // 150dp
-            mapView.layoutParams = params
+            navigationStopView()
 
-            // Supprimer bouton "Arreter la navigation"
-            btnFinishNavigation.visibility = View.GONE
+        }
+    }
 
-            // Afficher layout de recherche
-            layoutNavigationInput.visibility = View.VISIBLE
-            // Supprimer l'instruction
-            tvInstruction.visibility = View.GONE
-            layoutInstruction.visibility = View.GONE
-            // Afficher layout de recherche
-            layoutNavigationInput.visibility = View.VISIBLE
-            // Afficher bouton "demarrer la navigation"
-            btnStartNavigation.visibility = View.VISIBLE
-            // Afficher les filtre
-            layoutFilter.visibility = View.VISIBLE
+
+    private fun navigationStopView() {
+
+        val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
+        params.topMargin = 150 * resources.displayMetrics.density.toInt() // 150dp
+        mapView.layoutParams = params
+
+        // Supprimer bouton "Arreter la navigation"
+        btnFinishNavigation.visibility = View.GONE
+
+        // Afficher layout de recherche
+        layoutNavigationInput.visibility = View.VISIBLE
+        // Supprimer l'instruction
+        tvInstruction.visibility = View.GONE
+        layoutInstruction.visibility = View.GONE
+        // Afficher layout de recherche
+        layoutNavigationInput.visibility = View.VISIBLE
+        // Afficher bouton "demarrer la navigation"
+        btnStartNavigation.visibility = View.VISIBLE
+        // Afficher les filtre
+        layoutFilter.visibility = View.VISIBLE
+    }
+
+    /**
+     * navigationStartView
+     */
+    private fun navigationStartView() {
+
+        val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
+        params.topMargin = 0
+        mapView.layoutParams = params
+        mapView.controller.setZoom(18.0)
+
+        val tvInstructionParams = layoutInstruction.layoutParams as ViewGroup.MarginLayoutParams
+        tvInstructionParams.topMargin = 10 * resources.displayMetrics.density.toInt()
+        layoutInstruction.layoutParams = tvInstructionParams
+
+        // afficher l'instruction
+        layoutInstruction.visibility = View.VISIBLE
+        // Supprimer layout de recherche
+        layoutNavigationInput.visibility = View.GONE
+        // Supprimer bouton "demarrer la navigation"
+        btnStartNavigation.visibility = View.GONE
+        // Afficher bouton "Arréter la navigation"
+        btnFinishNavigation.visibility = View.VISIBLE
+    }
+
+    @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
+    fun getCurrentPosition() {
+
+        fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
+            if (location != null) {
+                val lat = location.latitude
+                val lon = location.longitude
+                currentPosition = GeoPoint(lat, lon)
+                configureMap(GeoPoint(lat, lon))
+            } else {
+                Toast.makeText(this, "Impossible d’obtenir la localisation", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -369,6 +403,8 @@ class MainActivity : AppCompatActivity() {
                 val destinationLatLng = LatLng(location?.latitude ?: 0.00 , location?.longitude ?: 0.00)
                 val currentLocationLatLng = LatLng(currentPosition.latitude, currentPosition.longitude)
 
+                currentDestination = GeoPoint(destinationLatLng.latitude, destinationLatLng.longitude)
+
                 displayAddress(finishAddress[0].getAddressLine(0).toString())
                 getDirections(currentLocationLatLng, destinationLatLng)
             } else {
@@ -378,6 +414,37 @@ class MainActivity : AppCompatActivity() {
             e.printStackTrace()
             Toast.makeText(this, "Erreur de géocodification", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /**
+     * isFarFromRoute
+     * @info: Dynamic route recalculation
+     */
+    fun isFarFromRoute(current: GeoPoint, routePoints: List<GeoPoint>, maxDistanceMeters: Double = 30.0): Boolean {
+
+        val minDistance = routePoints.minOf { point ->
+            current.distanceToAsDouble(point)
+        }
+
+        return minDistance > maxDistanceMeters
+    }
+
+    /**
+     * RouteRecalculation
+     * @info: Dynamic route recalculation
+     */
+    private fun routeRecalculation() {
+
+        //TODO: information ui reloading...
+
+        Log.d("GPS", "------------------------------------------")
+        Log.d("GPS", "Nouvelle intineraire !!!!!!!!!!!!!!!!!!")
+        Log.d("GPS", "------------------------------------------")
+
+        val currentPositionLatLng = LatLng(currentPosition.latitude, currentPosition.longitude)
+        val currentDestinationLatLng = LatLng(currentDestination.latitude, currentDestination.longitude)
+
+        getDirections(currentPositionLatLng, currentDestinationLatLng)
     }
 
     /**
@@ -411,7 +478,6 @@ class MainActivity : AppCompatActivity() {
 
                     ghResponse.instructions.forEach { instr ->
 
-                        Log.d("GPS", "3. ghResponse")
                         // Récupère les indices de début et fin dans geoPoints
                         val (startIdx, endIdx) = instr.interval
                         val arrow: Drawable?
@@ -611,7 +677,7 @@ class MainActivity : AppCompatActivity() {
 
         animateArrowTo(currentGeoPoint)
         animateMapTo(currentGeoPoint, bearing)
-        checkInstructionTrigger(currentGeoPoint)
+        checkInstructionTrigger(currentGeoPoint, bearing)
         lastPosition = position
     }
 
@@ -664,7 +730,7 @@ class MainActivity : AppCompatActivity() {
                 val lon = old.longitude + (newPosition.longitude - old.longitude) * fraction
                 val interpolated = GeoPoint(lat, lon)
 
-                mapView.mapOrientation = newBearing
+                mapView.mapOrientation = -newBearing
 
                 lastCenter = interpolated
                 mapView.controller.setCenter(interpolated)
@@ -674,24 +740,93 @@ class MainActivity : AppCompatActivity() {
         animator.start()
     }
 
-
     /**
      * checkInstructionTrigger
      * @info : Updates navigation instruction
      * @param currentLocation : GeoPoint
      */
-    private fun checkInstructionTrigger(currentLocation: GeoPoint) {
+    private fun checkInstructionTrigger(
+        currentLocation: GeoPoint,
+        deviceHeading: Float
+    ) {
+        if (instructions.isEmpty()) return
 
-        if (currentInstructionIndex >= instructions.size) return
+        // seuils personnalisables
+        val announceDistance = 80.0   // annonce à 80 m
+        val minDistanceToFire = 20.0  // changement d’instruction à 20 m
+        val maxAngleDiff = 90.0       // instruction devant dans ±90°
 
-        val currentInstruction = instructions[currentInstructionIndex]
-        val instructionPoint = currentInstruction.location
-        val distanceToInstruction = currentLocation.distanceToAsDouble(instructionPoint)
-        val nextInstruction = instructions[currentInstructionIndex]
+        // 1) on filtre les instructions à venir
+        val upcoming = instructions
+            .mapIndexed { idx, instr -> idx to instr }
+            .filter { (idx, _) -> idx > lastDisplayedInstructionIndex }
+            .filter { (_, instr) ->
+                // calcul du bearing de la position actuelle vers l’instruction
+                val bearingToInstr = currentLocation
+                    .toLocation()
+                    .bearingTo(instr.location.toLocation())
+                    .toDouble()
+                // ne garder que celles dont l’angle relatif est dans ±maxAngleDiff
+                kotlin.math.abs(normalizeBearingDiff(bearingToInstr - deviceHeading)) < maxAngleDiff
+            }
 
-        if (distanceToInstruction < 80 && currentInstructionIndex < instructions.size - 1) {
-            showInstruction(nextInstruction)
+        if (upcoming.isEmpty()) {
+            tvInstruction.text = ""
+            arrowImageView.setImageDrawable(
+                ContextCompat.getDrawable(this, R.drawable.nav_straight_bk)
+            )
+            return
         }
+
+        // 2) trouver la plus proche à vol d’oiseau
+        val (closestIdx, closestInstr) = upcoming.minByOrNull { (_, instr) ->
+            currentLocation.distanceToAsDouble(instr.location)
+        }!!
+
+        val distance = currentLocation.distanceToAsDouble(closestInstr.location)
+
+        // 3) logique d’annonce et de passage à la suivante
+        when {
+            // pré-annonce
+            distance < announceDistance && closestIdx == lastDisplayedInstructionIndex + 1 -> {
+                showInstruction(closestInstr)
+                // on ne change pas l’index tout de suite : on attend le déclencheur “réel”
+            }
+            // instruction “effectuée”
+            distance < minDistanceToFire -> {
+                lastDisplayedInstructionIndex = closestIdx
+                // si tu veux annoncer la suivante immédiatement :
+                if (lastDisplayedInstructionIndex + 1 < instructions.size) {
+                    showInstruction(instructions[lastDisplayedInstructionIndex + 1])
+                }
+            }
+            else -> {
+                var distanceKmAround = "0"
+                if(distance >= 1000.0){
+                    val distanceKm = distance / 1000.0
+                    distanceKmAround = String.format("%.1f", distanceKm) + " km"
+                }
+                if(distance < 1000.0){
+                    distanceKmAround = String.format("%.0f", distance) + " m"
+                }
+
+                tvInstruction.text = distanceKmAround
+                arrowImageView.setImageDrawable(
+                    ContextCompat.getDrawable(this, R.drawable.nav_straight_bk)
+                )
+            }
+        }
+    }
+
+    /**
+     * toLocation
+     * @info : Convert GeoPoint to Location
+     */
+    private fun GeoPoint.toLocation(): Location {
+        val loc = Location("osmdroid")
+        loc.latitude = this.latitude
+        loc.longitude = this.longitude
+        return loc
     }
 
     /**
@@ -702,7 +837,6 @@ class MainActivity : AppCompatActivity() {
     private fun showInstruction(nextInstruction: NavigationInstruction) {
         arrowImageView.setImageDrawable(nextInstruction.arrow)
         tvInstruction.text = nextInstruction.message
-        tvInstruction.visibility = View.VISIBLE
     }
 
     /**
