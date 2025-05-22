@@ -50,6 +50,7 @@ import android.widget.Spinner
 import com.quentin.navigationapp.network.Path
 import kotlinx.coroutines.Job
 import org.osmdroid.util.BoundingBox
+import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
@@ -75,8 +76,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var layoutFilter: LinearLayout
 
     //Navigation information:
-    private var totalMinutes: String = "00:00"
-    private var totalKilometers: String = "0"
+    private var totalMinutes: Long = 0
+    private var totalKilometers: Double = 0.0
     private lateinit var instructions: List<NavigationInstruction>
     private var lastPosition: Location? = null
     private var lastDisplayedInstructionIndex: Int = -1
@@ -340,6 +341,16 @@ class MainActivity : AppCompatActivity() {
                             routeRecalculation()
                         }
                         displayLastPathPolyline()
+
+                        // Appel de la méthode
+                        updateRemainingNavigation(
+                            currentPoint               = currentPosition,
+                            plannedRoutePoints         = routePoints,
+                            originalDistanceMeters     = totalKilometers,
+                            originalTimeMs             = totalMinutes,
+                            tvDistance                 = navigationDistance,
+                            tvTime                     = navigationTime
+                        )
                     }
                 }
             }
@@ -557,8 +568,8 @@ class MainActivity : AppCompatActivity() {
             try {
                 val currentLatLng = LatLng(currentPosition.latitude, currentPosition.longitude)
                 val navInstructions = mutableListOf<NavigationInstruction>()
-                totalMinutes = "0"
-                totalKilometers = "0"
+                totalMinutes = 0
+                totalKilometers = 0.0
 
                 // Appel à l'API
                 val responseTeste = navigationService.getRoute(currentLatLng, destinationLatLng, vehicle, weightings)
@@ -568,9 +579,9 @@ class MainActivity : AppCompatActivity() {
                     val points = ghResponse.points
                     val coordinates = points.coordinates
 
-                    totalMinutes = formatTime(ghResponse.time)
+                    totalMinutes = ghResponse.time
                     val distanceKm = ghResponse.distance / 1000.0
-                    totalKilometers = String.format("%.1f", distanceKm) + " km"
+                    totalKilometers = distanceKm
 
 
                     val coordinatesGeoPoints: List<GeoPoint> = coordinates.map { (lon, lat) ->
@@ -615,7 +626,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun formatTime(milliseconds: Long): String {
+    private fun formatTime(milliseconds: Long): String {
         val seconds = milliseconds / 1000
         val minutes = seconds / 60
         val hours = minutes / 60
@@ -632,7 +643,7 @@ class MainActivity : AppCompatActivity() {
      * @param sign : Code that identifies the specific navigation maneuver
      * @return : Drawable (icon)
      */
-    fun getArrowForInstruction(sign: Int?): Drawable? {
+    private fun getArrowForInstruction(sign: Int?): Drawable? {
 
         return when (sign){
             //Tout droit
@@ -664,7 +675,7 @@ class MainActivity : AppCompatActivity() {
      * @param bearing : current bearing
      * @return : Drawable (icon)
      */
-    fun getRoundaboutIconFromBearing(bearing: Double?): Drawable? {
+    private fun getRoundaboutIconFromBearing(bearing: Double?): Drawable? {
         val safeBearing = bearing ?: 0.0
         val angleDeg = Math.toDegrees(safeBearing)
 
@@ -686,7 +697,7 @@ class MainActivity : AppCompatActivity() {
      * @info : Displays the navigation vector plot
      * @param coordinates : List<GeoPoint>
      */
-     fun displayVectorPath(coordinates: List<GeoPoint>) {
+    private fun displayVectorPath(coordinates: List<GeoPoint>) {
         routePoints = coordinates.map { GeoPoint(it.latitude, it.longitude)}
 
         // SUPPRIMER l’ancien tracé s’il existe
@@ -710,24 +721,67 @@ class MainActivity : AppCompatActivity() {
 
             Handler(Looper.getMainLooper()).postDelayed({
                 mapView.zoomToBoundingBox(bbox, true, 300)
-
-                navigationTime.text = totalMinutes
-                navigationDistance.text = totalKilometers
-
             }, 300)
         }
         mapView.overlays.add(arrowMarker)
         mapView.invalidate()
     }
 
-    // 2️⃣ Quand tu démarres / arrêtes la navigation, mets à jour ton flag :
-    fun navigationisStarted(value: Boolean) {
+    /**
+     * navigationisStarted
+     */
+    private fun navigationisStarted(value: Boolean) {
         isNavigating = value
-
-
-
     }
 
+    /**
+     * updateRemainingNavigation
+     *
+     * @info : Met à jour les TextViews de distance et temps restants
+     * en fonction de la position courante sur la route planifiée.
+     *
+     * @param currentPoint  GeoPoint de la position actuelle
+     * @param plannedRoutePoints  Liste mutable des GeoPoint du tracé planifié
+     * @param originalDistanceMeters  Distance totale initiale du trajet (en mètres)
+     * @param originalTimeMs  Durée totale initiale du trajet (en millisecondes)
+     * @param tvDistance  TextView à mettre à jour pour la distance
+     * @param tvTime  TextView à mettre à jour pour le temps
+     */
+    fun updateRemainingNavigation(
+        currentPoint: GeoPoint,
+        plannedRoutePoints: List<GeoPoint>,
+        originalDistanceMeters: Double,
+        originalTimeMs: Long,
+        tvDistance: TextView,
+        tvTime: TextView
+    ) {
+        if (plannedRoutePoints.size < 2 || originalDistanceMeters <= 0) return
+
+        // Trouver l’index du point le plus proche
+        val closestIndex = plannedRoutePoints
+            .mapIndexed { idx, pt -> idx to pt }
+            .minByOrNull { it.second.distanceToAsDouble(currentPoint) }
+            ?.first ?: return
+
+        // Calculer la distance restante en sommant les segments restants
+        var remainingDistance = 0.0
+        for (i in closestIndex until plannedRoutePoints.size - 1) {
+            remainingDistance += plannedRoutePoints[i]
+                .distanceToAsDouble(plannedRoutePoints[i + 1])
+        }
+
+        // Calculer le temps restant par interpolation linéaire
+        val ratio = remainingDistance / originalDistanceMeters
+        val remainingTimeMs = (originalTimeMs * ratio).toLong()
+
+        // Mise en forme et affichage
+        val km = remainingDistance / 1000.0
+
+        tvDistance.text = String.format(Locale.FRANCE, "%.1f km", km)
+
+        //TODO: afficher le temps restant: 00h00 ou 00 min
+        //tvTime.text = originalTimeMs
+    }
 
 
     /**
