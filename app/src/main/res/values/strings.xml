@@ -12,4 +12,8 @@
     <string name="distance">0</string>
     <string name="start_navigation_description">Start navigation\n</string>
     <string name="stop_navigation_description">stop navigation</string>
+    <string name="wi_fi">Wi-Fi</string>
+    <string name="bluetooth">Bluetooth</string>
+    <string name="se_connecter_l_appareil">Se connecter à l\'appareil</string>
+    <string name="connexion">Connexion</string>
 </resources>

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <!-- 1. Type de véhicule -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Type de véhicule"
+            android:textStyle="bold"
+            android:layout_marginTop="8dp"/>
+        <Spinner
+            android:id="@+id/spinner_type"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:spinnerMode="dropdown"/>
+
+        <!-- 2. Sous-type, dépend du type sélectionné -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sous-type"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"/>
+        <Spinner
+            android:id="@+id/spinner_subtype"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:spinnerMode="dropdown"/>
+
+        <!-- 3. Couleur (hexadécimal) -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Couleur du véhicule (#RRGGBB)"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"/>
+        <EditText
+            android:id="@+id/et_color"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="#FF0000"
+            android:inputType="text"
+            android:maxLines="1"/>
+
+        <!-- 4. Nom du profil -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nom du profil"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"/>
+        <EditText
+            android:id="@+id/et_profile_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Ex : Ma Moto Sport"
+            android:inputType="textPersonName"
+            android:maxLines="1"/>
+
+        <!-- 5. Consommation moyenne -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Consommation moyenne (L/100km ou kWh/100km)"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"/>
+        <EditText
+            android:id="@+id/et_consumption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Ex : 5.5"
+            android:inputType="numberDecimal"
+            android:maxLines="1"/>
+
+    </LinearLayout>
+</ScrollView>

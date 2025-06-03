@@ -1,171 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:map="http://schemas.android.com/apk/res-auto"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/coordinator_main"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <LinearLayout
-        android:id="@+id/layout_navigation_Input"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        map:layout_constraintTop_toTopOf="parent">
-        <LinearLayout
-            android:id="@+id/layout_input"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            map:layout_constraintTop_toTopOf="parent">
-
-            <EditText
-                android:id="@+id/etDestination"
-                android:layout_width="288dp"
-                android:layout_height="wrap_content"
-                android:autofillHints="enter your destination"
-                android:hint="@string/destination"
-                android:inputType="text"
-                android:padding="16dp"
-                map:layout_constraintEnd_toEndOf="parent"
-                map:layout_constraintStart_toStartOf="parent"
-                map:layout_constraintTop_toTopOf="parent" />
-
-            <Button
-                android:id="@+id/searchNavigationButton"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:text="@string/search"
-                map:layout_constraintEnd_toEndOf="parent"
-                map:layout_constraintStart_toStartOf="parent"
-                map:layout_constraintTop_toBottomOf="@+id/layout_input" />
-        </LinearLayout>
-
-        <!-- 3. Spinner de transport -->
-        <LinearLayout
-            android:id="@+id/layout_filter"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            map:layout_constraintTop_toTopOf="parent">
-
-            <Spinner
-                android:id="@+id/transport_spinner"
-                android:layout_width="110dp"
-                android:layout_height="50dp"
-                android:layout_margin="16dp"/>
-
-            <Spinner
-                android:id="@+id/speed_spinner"
-                android:layout_width="110dp"
-                android:layout_height="50dp"
-                android:layout_margin="16dp"/>
-        </LinearLayout>
-    </LinearLayout>
-
-
-    <!-- 1. La carte OSMdroid -->
-    <org.osmdroid.views.MapView
-        android:id="@+id/map"
-        android:layout_marginTop="150dp"
+    <!-- Conteneur de fragments: prend tout l'espace disponible -->
+    <FrameLayout
+        android:id="@+id/nav_host_fragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        />
+        android:layout_above="@id/bottom_navigation" >
+    </FrameLayout>
 
-    <LinearLayout
-        android:id="@+id/layout_instruction"
-        android:layout_marginTop="155dp"
+    <!-- Bottom Navigation Bar -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:background="@drawable/rounded_black_background"
-        android:layout_marginRight="10dp"
-        android:layout_marginLeft="10dp"
-        map:layout_constraintTop_toTopOf="parent">
+        android:layout_gravity="bottom"
+        android:background="@color/black"
+        app:itemIconTint="@color/bottom_nav_color_state"
+        app:itemTextColor="@color/bottom_nav_color_state"
+        app:menu="@menu/bottom_nav_menu" />
 
-        <!-- ImageView pour la flèche -->
-        <ImageView
-            android:id="@+id/arrowImageView"
-            android:layout_width="60dp"
-            android:layout_height="60dp"
-            android:layout_margin="10dp"
-            android:contentDescription="@string/image"
-            android:background="@drawable/rounded_white_background"/>
-
-        <TextView
-            android:id="@+id/tvInstruction"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:layout_marginEnd="20dp"
-            android:text="@string/instruction"
-            android:textSize="18sp"
-            android:padding="16dp"
-            android:color="#FFFFFF"
-            android:gravity="center" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/layout_control"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_gravity="bottom|center_horizontal"
-        android:background="@drawable/rounded_black_background"
-        android:layout_marginRight="10dp"
-        android:layout_marginLeft="10dp"
-        android:layout_marginBottom="10dp"
-        map:layout_constraintTop_toTopOf="parent">
-
-        <TextView
-            android:id="@+id/navigation_time"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:layout_marginEnd="10dp"
-            android:text="@string/time"
-            android:textSize="18sp"
-            android:padding="16dp"
-            android:color="#FFFFFF"
-            android:gravity="center" />
-
-        <TextView
-            android:id="@+id/navigation_distance"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:layout_marginEnd="10dp"
-            android:text="@string/distance"
-            android:textSize="18sp"
-            android:padding="16dp"
-            android:color="#FFFFFF"
-            android:gravity="center" />
-
-        <View
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <!-- Bouton pour lancer la navigation -->
-        <Button
-            android:id="@+id/btnStartNavigation"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|center_horizontal"
-            android:drawableStart="@drawable/round_navigation_white_48"
-            android:backgroundTint="@color/black"
-            android:textColor="@android:color/white"
-            android:contentDescription="@string/start_navigation_description"
-            android:elevation="6dp" />
-
-        <!-- 2. Bouton pour arreter la navigation -->
-        <Button
-            android:id="@+id/btnFinishNavigation"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:backgroundTint="@color/black"
-            android:drawableStart="@drawable/osm_ic_follow_me"
-            android:textColor="@android:color/white"
-            android:elevation="6dp"
-            android:contentDescription="@string/stop_navigation_description"
-            android:visibility="gone"/>
-    </LinearLayout>
-</FrameLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

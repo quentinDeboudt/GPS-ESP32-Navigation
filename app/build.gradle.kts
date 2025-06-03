@@ -78,6 +78,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.coordinatorlayout)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -116,5 +117,8 @@ dependencies {
     // Pour l’injection dans les ViewModels
     implementation ("androidx.hilt:hilt-lifecycle-viewmodel:1.0.0-alpha03")
     implementation ("androidx.hilt:hilt-compiler:1.0.0")
+
+    implementation("com.google.android.material:material:1.8.0")
+
 
 }

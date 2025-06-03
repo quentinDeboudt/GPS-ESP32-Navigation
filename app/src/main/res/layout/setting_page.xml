@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/layout_page1"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/background_dark">
+
+    <!-- Contenu vierge → Ici un simple texte pour la démonstration -->
+    <TextView
+        android:id="@+id/text_page1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Page 4 (setting)"
+        android:textColor="@android:color/white"
+        android:textSize="24sp"
+        android:layout_gravity="center"/>
+</FrameLayout>
