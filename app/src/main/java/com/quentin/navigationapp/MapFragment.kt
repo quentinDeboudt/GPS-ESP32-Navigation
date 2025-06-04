@@ -50,12 +50,7 @@ data class NavigationInstruction(
 
 class MapFragment : Fragment() {
 
-    // --- Variables de localisation / navigation ---
-    private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private lateinit var sensorManager: SensorManager
-    private val navigationService = NavigationService()
-
-    // Widgets du layout (fragment_page2.xml)
+    // Widgets du layout
     private lateinit var mapView: MapView
     private lateinit var tvInstruction: TextView
     private lateinit var arrowImageView: ImageView
@@ -72,7 +67,10 @@ class MapFragment : Fragment() {
     private lateinit var speedSpinner: Spinner
     private lateinit var searchNavigationButton: Button
 
-    // Infos de navigation
+    // Navigation variables
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var sensorManager: SensorManager
+    private val navigationService = NavigationService()
     private var totalMinutes: Long = 0
     private var totalKilometers: Double = 0.0
     private lateinit var instructions: List<NavigationInstruction>
@@ -80,7 +78,6 @@ class MapFragment : Fragment() {
     private var lastDisplayedInstructionIndex: Int = -1
     private var lastCenter: GeoPoint? = null
 
-    // Variables métier de navigation
     private lateinit var currentPosition: GeoPoint
     private lateinit var currentDestination: GeoPoint
     private var routePoints: List<GeoPoint> = emptyList()
@@ -94,10 +91,8 @@ class MapFragment : Fragment() {
     private var currentRoutePolyline: Polyline? = null
     private var currentProfile: Profile? = null
 
-    // Dispatcher I/O pour les Flows
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 
-    // Clés SharedPreferences (mêmes que dans Page1Fragment)
     private val PREFS_NAME = "app_navigation_prefs"
     private val KEY_PROFILES_JSON = "profiles_json"
     private val KEY_CURRENT_PROFILE = "current_profile"
@@ -116,7 +111,12 @@ class MapFragment : Fragment() {
         override fun toString(): String = label
     }
 
-    /** Récupère la liste complète des profils depuis le JSON en SharedPreferences. */
+    /**
+     * loadProfilesFromPrefs
+     * Load the profiles from the shared preferences.
+     * @param context The context of the activity.
+     * @return A list of profiles.
+     */
     private fun loadProfilesFromPrefs(context: Context): List<Profile> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val jsonString = prefs.getString(KEY_PROFILES_JSON, null) ?: return emptyList()
@@ -141,19 +141,34 @@ class MapFragment : Fragment() {
         return list
     }
 
-    /** Récupère le nom du profil actif (ou null si non défini). */
+    /**
+     * loadCurrentProfileName
+     * Load the current profile name from the shared preferences.
+     * @param context The context of the activity.
+     * @return The name of the current profile.
+     */
     private fun loadCurrentProfileName(context: Context): String? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getString(KEY_CURRENT_PROFILE, null)
     }
 
-    /** Retourne l’objet Profile correspondant au profil actif, ou null. */
+
+    /**
+     * getCurrentProfile
+     * get the current profile from the shared preferences.
+     * @param context The context of the activity.
+     * @return The current profile.
+     */
     private fun getCurrentProfile(context: Context): Profile? {
         val currentName = loadCurrentProfileName(context) ?: return null
         return loadProfilesFromPrefs(context).firstOrNull { it.name == currentName }
     }
 
-    // Flow qui émet la position GPS à chaque mise à jour
+    /**
+     * locationFlow
+     * Get the current location as a Flow.
+     * @return A Flow emitting the current location.
+     */
     private val locationFlow: Flow<Location> by lazy {
         callbackFlow @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION]) {
             if (ContextCompat.checkSelfPermission(
@@ -187,6 +202,11 @@ class MapFragment : Fragment() {
             .conflate()
     }
 
+    /**
+     * onCreate
+     * Called when the fragment is first created.
+     * @param savedInstanceState If the fragment is being re-created from a previous saved state, this is the state.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Configuration OSMdroid (obtenir SharedPreferences)
@@ -196,6 +216,14 @@ class MapFragment : Fragment() {
         )
     }
 
+    /**
+     * onCreateView
+     * Called to have the fragment instantiate its user interface view.
+     * @param inflater
+     * @param container
+     * @param savedInstanceState
+     * @return Return the View for the fragment's UI, or null.
+     */
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -205,6 +233,12 @@ class MapFragment : Fragment() {
         return inflater.inflate(R.layout.map_page, container, false)
     }
 
+    /**
+     * onViexCreated
+     * Called when the view is created.
+     * @param view The view.
+     * @param savedInstanceState If the fragment is being re-created from a previous saved state, this is the state.
+     */
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -225,11 +259,9 @@ class MapFragment : Fragment() {
             Toast.makeText(requireContext(), "Aucun profil actif détecté", Toast.LENGTH_SHORT).show()
         }
 
-        // 1️⃣ Initialisation des services Android
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
         sensorManager = requireActivity().getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
-        // 2️⃣ Récupérer tous les widgets du layout (fragment_page2.xml)
         mapView = view.findViewById(R.id.map)
         tvInstruction = view.findViewById(R.id.tvInstruction)
         arrowImageView = view.findViewById(R.id.arrowImageView)
@@ -244,16 +276,14 @@ class MapFragment : Fragment() {
         btnOpenModal = view.findViewById(R.id.btnOpenModal)
         searchNavigationButton = view.findViewById(R.id.searchNavigationButton)
 
-        // 3️⃣ Cacher par défaut certains composants
         btnStartNavigation.visibility = View.GONE
         btnFinishNavigation.visibility = View.GONE
         layoutInstruction.visibility = View.GONE
         layoutControl.visibility = View.GONE
 
-        // 4️⃣ Obtenir la dernière position GPS et configurer la carte
         getCurrentPosition()
 
-        // 6️⃣ Recherche de l’itinéraire au clic
+        //button search navigation
         searchNavigationButton.setOnClickListener {
             getCurrentPosition()
             lastVectorPath.clear()
@@ -263,7 +293,7 @@ class MapFragment : Fragment() {
             }
             mapView.invalidate()
 
-            // Masquer le clavier
+            // Hide keyboard
             val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
             imm.hideSoftInputFromWindow(tvDestination.windowToken, 0)
             tvDestination.clearFocus()
@@ -289,7 +319,7 @@ class MapFragment : Fragment() {
             }
         }
 
-        // 7️⃣ Lancement de la navigation au clic (avec gestion de permissions)
+        // Launch navigation
         var navigationJob: Job? = null
         requestPermissionsIfNeeded {
             btnStartNavigation.setOnClickListener {
@@ -318,7 +348,7 @@ class MapFragment : Fragment() {
             }
         }
 
-        // 8️⃣ Arrêt de la navigation au clic
+        // Stop navigation
         btnFinishNavigation.setOnClickListener {
             mapView.overlays.remove(arrowMarker)
             navigationisStarted(false)
@@ -328,15 +358,18 @@ class MapFragment : Fragment() {
             navigationStopView()
         }
 
-        // 9️⃣ Ouverture du modal (dialog) pour la connexion à un device
+        // open dialog connection wifi/bluetooth
         btnOpenModal.setOnClickListener {
             val dialog = DeviceConnectDialogFragment()
             dialog.show(parentFragmentManager, "DeviceConnectDialog")
         }
     }
 
-    // ─── Fonctions principales de navigation et de carte ──────────────────────────────────
 
+    /**
+     * getCurrentPosition
+     * Retrieves the current GPS position.
+     */
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     private fun getCurrentPosition() {
         fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
@@ -351,6 +384,11 @@ class MapFragment : Fragment() {
         }
     }
 
+    /**
+     * getCoordinatesFromAddress
+     * Retrieves the GPS coordinates from an address.
+     * @param address The address to geocode.
+     */
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     private fun getCoordinatesFromAddress(address: String) {
         val geocoder = Geocoder(requireContext())
@@ -374,6 +412,11 @@ class MapFragment : Fragment() {
         }
     }
 
+    /**
+     * getDirections
+     * Retrieves the directions from the current position to the destination.
+     * @param destinationLatLng The GPS coordinates of the destination.
+     */
     private fun getDirections(destinationLatLng: com.google.android.gms.maps.model.LatLng) {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -424,16 +467,21 @@ class MapFragment : Fragment() {
         }
     }
 
+    /**
+     * displayVectorPath
+     * Displays the vector path on the map.
+     * @param coordinates The list of GPS coordinates.
+     */
     private fun displayVectorPath(coordinates: List<GeoPoint>) {
         routePoints = coordinates.map { GeoPoint(it.latitude, it.longitude) }
 
-        // Supprimer ancien tracé
+        // Delete old vector track
         currentRoutePolyline?.let { old ->
             mapView.overlays.remove(old)
             mapView.invalidate()
         }
 
-        // Créer et ajouter nouveau tracé
+        // Create and add new path on the MapView
         val newPolyline = Polyline().apply {
             setPoints(routePoints)
             width = 12f
@@ -449,11 +497,16 @@ class MapFragment : Fragment() {
             }, 300)
         }
 
-        // Ajouter la flèche de navigation
+        // Add navigation arrow
         mapView.overlays.add(arrowMarker)
         mapView.invalidate()
     }
 
+    /**
+     * routeRecalculation
+     * Recalculates the route if the current position is far from the initial route.
+     * @calls getDirections
+     */
     private fun routeRecalculation() {
         val destLatLng = com.google.android.gms.maps.model.LatLng(
             currentDestination.latitude,
@@ -462,6 +515,10 @@ class MapFragment : Fragment() {
         getDirections(destLatLng)
     }
 
+    /**
+     * displayLastPathPolyline
+     * Displays the last path on the map.
+     */
     private fun displayLastPathPolyline() {
         lastVectorPath.add(currentPosition)
         if (traveledPathPolyline == null) {
@@ -475,6 +532,10 @@ class MapFragment : Fragment() {
         mapView.invalidate()
     }
 
+    /**
+     * formatTime
+     * Formats the time in milliseconds to a string.
+     */
     private fun formatTime(milliseconds: Long): String {
         val seconds = milliseconds / 1000
         val minutes = seconds / 60
@@ -484,6 +545,12 @@ class MapFragment : Fragment() {
         return String.format("%02d:%02d:%02d", hours, remainingMinutes, remainingSeconds)
     }
 
+    /**
+     * getArrowForInstruction
+     * Gets the arrow icon for the given instruction.
+     * @param sign The instruction sign.
+     * @return The arrow icon.
+     */
     private fun getArrowForInstruction(sign: Int?): Drawable? {
         return when (sign) {
             0 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_straight_bk)
@@ -497,6 +564,12 @@ class MapFragment : Fragment() {
         }
     }
 
+    /**
+     * getRoundaboutIconFromBearing
+     * Gets the roundabout icon for the given bearing.
+     * @param bearing The bearing.
+     * @return The roundabout icon.
+     */
     private fun getRoundaboutIconFromBearing(bearing: Double?): Drawable? {
         val safeBearing = bearing ?: 0.0
         val angleDeg = Math.toDegrees(safeBearing)
@@ -513,6 +586,10 @@ class MapFragment : Fragment() {
         }
     }
 
+    /**
+     * navigationStartView
+     * Displays the navigation view.
+     */
     private fun navigationStartView() {
         // Ajuster le layout de la carte en haut pour laisser place aux instructions
         val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
@@ -530,6 +607,10 @@ class MapFragment : Fragment() {
         btnFinishNavigation.visibility = View.VISIBLE
     }
 
+    /**
+     * navigationStopView
+     * Hides the navigation view.
+     */
     private fun navigationStopView() {
         val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
         params.topMargin = (200 * resources.displayMetrics.density).toInt() // ~150dp
@@ -542,10 +623,23 @@ class MapFragment : Fragment() {
         layoutFilter.visibility = View.VISIBLE
     }
 
+    /**
+     * navigationisStarted
+     * Sets the navigation state.
+     * @param value The navigation state.
+     */
     private fun navigationisStarted(value: Boolean) {
         isNavigating = value
     }
 
+    /**
+     * updateArrowOverlay
+     * Updates the arrow overlay.
+     * @param position The current GPS position.
+     * @calls animateArrowTo
+     * @calls animateMapTo
+     * @calls checkInstructionTrigger
+     */
     private fun updateArrowOverlay(position: Location) {
         val currentGeo = GeoPoint(position.latitude, position.longitude)
         val bearing: Float = position.bearing
@@ -559,6 +653,12 @@ class MapFragment : Fragment() {
         lastPosition = position
     }
 
+    /**
+     * animateArrowTo
+     * Animates the arrow to the given position.
+     * @param newPos The new GPS position.
+     * @param duration The animation duration.
+     */
     private fun animateArrowTo(newPos: GeoPoint, duration: Long = 1500L) {
         val oldCenter = lastCenter ?: newPos
         val animator = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -576,6 +676,13 @@ class MapFragment : Fragment() {
         animator.start()
     }
 
+    /**
+     * animateMapTo
+     * Animates the map to the given position and bearing.
+     * @param newPos The new GPS position.
+     * @param newBearing The new bearing.
+     * @param duration The animation duration.
+     */
     private fun animateMapTo(newPos: GeoPoint, newBearing: Float, duration: Long = 1300L) {
         val oldCenter = lastCenter ?: newPos
         val animator = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -594,6 +701,14 @@ class MapFragment : Fragment() {
         animator.start()
     }
 
+    /**
+     * checkInstructionTrigger
+     * Checks if an instruction should be displayed.
+     * @param currentLocation The current GPS position.
+     * @param deviceHeading The current device heading.
+     * @calls showInstruction
+     * @calls normalizeBearingDiff
+     */
     private fun checkInstructionTrigger(currentLocation: GeoPoint, deviceHeading: Float) {
         if (instructions.isEmpty()) return
 
@@ -601,6 +716,7 @@ class MapFragment : Fragment() {
         val minDistanceToFire = 20.0
         val maxAngleDiff = 90.0
 
+        // Find upcoming instructions
         val upcoming = instructions
             .mapIndexed { idx, instr -> idx to instr }
             .filter { (idx, _) -> idx > lastDisplayedInstructionIndex }
@@ -611,6 +727,7 @@ class MapFragment : Fragment() {
                 abs(normalizeBearingDiff(bearingToInstr - deviceHeading)) < maxAngleDiff
             }
 
+        // Display instruction (straight destination)
         if (upcoming.isEmpty()) {
             tvInstruction.text = ""
             arrowImageView.setImageDrawable(
@@ -649,17 +766,35 @@ class MapFragment : Fragment() {
         }
     }
 
+    /**
+     * GeoPoint.toLocation
+     * Converts a GeoPoint to a Location.
+     * @return The converted Location.
+     */
     private fun GeoPoint.toLocation(): Location =
         Location("osmdroid").apply {
             latitude = this@toLocation.latitude
             longitude = this@toLocation.longitude
         }
 
+    /**
+     * showInstruction
+     * Displays the given instruction.
+     * @param instr The instruction to display.
+     */
     private fun showInstruction(instr: NavigationInstruction) {
         arrowImageView.setImageDrawable(instr.arrow)
         tvInstruction.text = instr.message
     }
 
+    /**
+     * distanceToSegment
+     * Calculates the distance from the current position to the segment.
+     * @param current The current position.
+     * @param start The start of the segment.
+     * @param end The end of the segment.
+     * @return The distance from the current position to the segment.
+     */
     private fun distanceToSegment(current: GeoPoint, start: GeoPoint, end: GeoPoint): Double {
         val R = 6_371_000.0
         val lat0 = Math.toRadians(current.latitude)
@@ -688,6 +823,15 @@ class MapFragment : Fragment() {
         return hypot(distX, distY)
     }
 
+    /**
+     * isFarFromRoute
+     * Checks if the current position is far from the route.
+     * @param current The current position.
+     * @param routePoints The list of route points.
+     * @param maxDistanceMeters The maximum distance from the route.
+     * @return True if the current position is far from the route, false otherwise.
+     * @calls distanceToSegment
+     */
     private fun isFarFromRoute(current: GeoPoint, routePoints: List<GeoPoint>, maxDistanceMeters: Double = 30.0): Boolean {
         if (routePoints.size < 2) return true
         val minDist = routePoints.zipWithNext().minOfOrNull { (start, end) ->
@@ -696,6 +840,16 @@ class MapFragment : Fragment() {
         return minDist > maxDistanceMeters
     }
 
+    /**
+     * updateRemainingNavigation
+     * Updates the remaining navigation.
+     * @param currentPoint The current GPS position.
+     * @param plannedRoutePoints The list of planned route points.
+     * @param originalDistanceMeters The original distance in meters.
+     * @param originalTimeMs The original time in milliseconds.
+     * @param tvDistance The distance text view.
+     * @param tvTime The time text view.
+     */
     private fun updateRemainingNavigation(
         currentPoint: GeoPoint,
         plannedRoutePoints: List<GeoPoint>,
@@ -723,12 +877,23 @@ class MapFragment : Fragment() {
         // TODO : afficher le temps restant (format hh:mm ou mm:ss)
     }
 
+    /**
+     * displayAddress
+     * Displays the given address.
+     * @param address The address to display.
+     */
     private fun displayAddress(address: String) {
         if (address.isNotEmpty()) {
             tvDestination.text = "📍 $address"
         }
     }
 
+    /**
+     * configureMap
+     * Configures the map.
+     * @param location The GPS position.
+     * @calls displayArrowNavigation
+     */
     private fun configureMap(location: GeoPoint) {
         mapView.setTileSource(TileSourceFactory.MAPNIK)
         mapView.setMultiTouchControls(true)
@@ -739,6 +904,11 @@ class MapFragment : Fragment() {
         displayArrowNavigation(location)
     }
 
+    /**
+     * displayArrowNavigation
+     * Displays the arrow navigation.
+     * @param location The GPS position.
+     */
     private fun displayArrowNavigation(location: GeoPoint) {
         if (::mapView.isInitialized && ::arrowMarker.isInitialized) {
             mapView.overlays.remove(arrowMarker)
@@ -754,49 +924,21 @@ class MapFragment : Fragment() {
         mapView.invalidate()
     }
 
-    private fun setupSpeedSpinner() {
-        val iconsSpeed = listOf(R.drawable.ic_speed_logo, R.drawable.ic_slow_logo)
-        val speedAdapter = object : ArrayAdapter<Int>(
-            requireContext(),
-            R.layout.item_icon_speed_spinner,
-            iconsSpeed
-        ) {
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val imageView = LayoutInflater.from(context)
-                    .inflate(R.layout.item_icon_speed_spinner, parent, false) as ImageView
-                imageView.setImageResource(getItem(position)!!)
-                return imageView
-            }
-
-            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val imageView = LayoutInflater.from(context)
-                    .inflate(R.layout.item_icon_speed_spinner, parent, false) as ImageView
-                imageView.setImageResource(getItem(position)!!)
-                return imageView
-            }
-        }
-        speedSpinner.adapter = speedAdapter
-        speedSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(
-                parent: AdapterView<*>,
-                view: View?,
-                position: Int,
-                id: Long
-            ) {
-                weightings = when (iconsSpeed[position]) {
-                    R.drawable.ic_speed_logo -> "fastest"
-                    R.drawable.ic_slow_logo -> "eco"
-                    else -> weightings
-                }
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-    }
-
+    /**
+     * normalizeBearingDiff
+     * Normalizes the bearing difference.
+     * @param diff The bearing difference.
+     * @return The normalized bearing difference.
+     */
     private fun normalizeBearingDiff(diff: Double): Double =
         ((diff + 540) % 360) - 180
 
+    /**
+     * requestPermissionsIfNeeded
+     * Requests permissions if needed.
+     * @param onGranted The callback to call when permissions are granted.
+     * @calls registerForActivityResult
+     */
     private fun requestPermissionsIfNeeded(onGranted: () -> Unit) {
         val perms = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
         val launcher = registerForActivityResult(
@@ -811,35 +953,4 @@ class MapFragment : Fragment() {
         }
     }
 
-    // ─── Propagation du cycle de vie OSMdroid ───────────────────────────────────────────────
-    /* override fun onResume() {
-        super.onResume()
-        mapView.onResume()
-    }
-
-    override fun onStart() {
-        super.onStart()
-        mapView.onStart()
-    }
-
-      override fun onStop() {
-           super.onStop()
-           mapView.onStop()
-       }
-
-    override fun onPause() {
-        mapView.onPause()
-        super.onPause()
-    }
-   override fun onDestroy() {
-       mapView.onDestroy()
-       super.onDestroy()
-   }
-
-   override fun onLowMemory() {
-       super.onLowMemory()
-       mapView.onLowMemory()
-   }
-
- */
 }
