@@ -23,7 +23,6 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.*
-import com.quentin.navigationapp.VehicleSubType
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -43,13 +42,11 @@ import java.io.IOException
 import java.util.Locale
 import kotlin.math.*
 
-// --- Data class pour stocker les instructions de navigation ---
 data class NavigationInstruction(
     val message: String,
     val location: GeoPoint,
     val arrow: Drawable? = null
 )
-
 
 class MapFragment : Fragment() {
 
@@ -105,12 +102,10 @@ class MapFragment : Fragment() {
     private val KEY_PROFILES_JSON = "profiles_json"
     private val KEY_CURRENT_PROFILE = "current_profile"
 
-    /** Data class identique à celle de Page1Fragment.kt */
     data class Profile(
         val name: String,
         val type: String,
         val subType: VehicleSubType,
-        val colorHex: String,
         val consumption: Double
     )
 
@@ -140,7 +135,6 @@ class MapFragment : Fragment() {
                 name = obj.getString("name"),
                 type = obj.getString("type"),
                 subType = subType,
-                colorHex = obj.getString("colorHex"),
                 consumption = obj.getDouble("consumption")
             )
         }

@@ -2,7 +2,6 @@ package com.quentin.navigationapp
 
 import android.content.Context
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,7 +16,6 @@ data class Profile(
     val name: String,
     val type: String,
     val subType: VehicleSubType,
-    val colorHex: String,
     val consumption: Double
 )
 
@@ -156,7 +154,6 @@ class HomeFragment : Fragment() {
                 name = obj.getString("name"),
                 type = obj.getString("type"),
                 subType = subType,
-                colorHex = obj.getString("colorHex"),
                 consumption = obj.getDouble("consumption")
             )
             list.add(p)
@@ -179,7 +176,6 @@ class HomeFragment : Fragment() {
                 put("name", profile.name)
                 put("type", profile.type)
                 put("subType", subTypeJson)
-                put("colorHex", profile.colorHex)
                 put("consumption", profile.consumption)
             }
             jsonArray.put(obj)
@@ -234,7 +230,6 @@ class HomeFragment : Fragment() {
         // Récupérer toutes les vues
         val spinnerType = dialogView.findViewById<Spinner>(R.id.spinner_type)
         val spinnerSubType = dialogView.findViewById<Spinner>(R.id.spinner_subtype)
-        val etColor = dialogView.findViewById<EditText>(R.id.et_color)
         val etName = dialogView.findViewById<EditText>(R.id.et_profile_name)
         val etConsumption = dialogView.findViewById<EditText>(R.id.et_consumption)
 
@@ -322,21 +317,13 @@ class HomeFragment : Fragment() {
                 // Lire tous les champs
                 val chosenType = spinnerType.selectedItem as String
                 val chosenSub = spinnerSubType.selectedItem as VehicleSubType
-                val colorInput = etColor.text.toString().trim()
                 val nameInput = etName.text.toString().trim()
                 val consumptionInput = etConsumption.text.toString().trim()
 
                 // Validation minimale
-                if (nameInput.isEmpty() || colorInput.isEmpty() || consumptionInput.isEmpty()) {
+                if (nameInput.isEmpty() || consumptionInput.isEmpty()) {
                     Toast.makeText(requireContext(),
                         "Tous les champs sont obligatoires", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-
-                // Vérifier format hex (#RRGGBB)
-                if (!colorInput.matches(Regex("^#[0-9A-Fa-f]{6}\$"))) {
-                    Toast.makeText(requireContext(),
-                        "Couleur invalide (ex : #FF0000)", Toast.LENGTH_SHORT).show()
                     return@setPositiveButton
                 }
 
@@ -360,7 +347,6 @@ class HomeFragment : Fragment() {
                     name = nameInput,
                     type = chosenType,
                     subType = chosenSub,
-                    colorHex = colorInput,
                     consumption = consValue
                 )
 
