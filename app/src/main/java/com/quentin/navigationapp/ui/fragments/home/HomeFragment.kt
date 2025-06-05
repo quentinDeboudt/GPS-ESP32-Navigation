@@ -1,11 +1,18 @@
 package com.quentin.navigationapp.ui.fragments.home
 
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import com.quentin.navigationapp.R
@@ -56,7 +63,7 @@ class HomeFragment : Fragment() {
 
         adapterProfiles = ArrayAdapter(
             requireContext(),
-            android.R.layout.simple_spinner_item,
+            R.layout.spinner_selected_item,
             displayNames
         ).also { adp ->
             adp.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
@@ -87,6 +94,7 @@ class HomeFragment : Fragment() {
             }
         }
 
+
         // 4) Gérer la sélection dans le Spinner
         spinnerProfiles.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(
@@ -112,8 +120,6 @@ class HomeFragment : Fragment() {
             override fun onNothingSelected(parent: AdapterView<*>) { }
         }
     }
-
-    // ─── Gestion du JSON dans SharedPreferences ──────────────────────────────────────
 
     /** Lit la liste de profils (clé JSON) et la renvoie en MutableList<Profile>. */
     private fun loadProfiles(): MutableList<Profile> {
@@ -141,7 +147,6 @@ class HomeFragment : Fragment() {
         return list
     }
 
-
     /** Sauvegarde la liste complète de Profile en JSON. */
     private fun saveProfiles(profiles: List<Profile>) {
         val jsonArray = JSONArray()
@@ -164,7 +169,6 @@ class HomeFragment : Fragment() {
         prefs.edit().putString(KEY_PROFILES_JSON, jsonArray.toString()).apply()
     }
 
-
     /** Renvoie le nom du profil actif ou null si aucun. */
     private fun loadCurrentProfileName(): String? {
         return prefs.getString(KEY_CURRENT_PROFILE, null)
@@ -177,16 +181,11 @@ class HomeFragment : Fragment() {
             .apply()
     }
 
-    // ─── Fonction d’update de l’icône selon le profil choisi ──────────────────────────
-
     /**
+     * updateVehicleIcon
      * Met à jour ivVehicleIcon en fonction du type (ou du sous-type “Scooter”).
-     * Vous devez avoir les drawables suivants dans res/drawable/ :
-     *   • ic_moto.png       (ou ic_moto.xml vector)
-     *   • ic_voiture.png
-     *   • ic_trottinette.png
-     *   • ic_scooter.png     (pour le sous-type “Scooter” si besoin)
-     *   • ic_placeholder_vehicle.png (icône par défaut ou vide)
+     * @param profile : Profile
+     * @calls displayProfileInfo
      */
     private fun updateVehicleIcon(profile: Profile) {
         val resId = when {
@@ -196,12 +195,39 @@ class HomeFragment : Fragment() {
 
             else -> R.mipmap.ic_profile_default_image_foreground
         }
+
         ivVehicleIcon.setImageResource(resId)
+
+        displayProfileInfo(profile)
+    }
+
+    /**
+     * displayProfileInfo
+     * @param profile : Profile
+     */
+    private fun displayProfileInfo(profile: Profile) {
+
+        val gridLayout = view?.findViewById<GridLayout>(R.id.grid_profile_info)
+
+        if (gridLayout != null) {
+            gridLayout.removeAllViews()
+            val profileData = listOf(
+                "type" to profile.subType,
+                "Consommation" to profile.consumption.toString() + " L/100km"
+            )
+
+            for ((title, value) in profileData) {
+                val card = LayoutInflater.from(requireContext())
+                    .inflate(R.layout.item_profile_info, gridLayout, false)
+
+                card.findViewById<TextView>(R.id.tv_title).text = title
+                card.findViewById<TextView>(R.id.tv_value).text = value.toString()
+                gridLayout.addView(card)
+            }
+        }
     }
 
     // ─── Boîte de dialogue pour ajouter un nouveau profil (avec 5 champs) ─────────────
-
-
     private fun showAddProfileDialog() {
         // Inflater le layout personnalisé
         val dialogView = LayoutInflater.from(requireContext())
