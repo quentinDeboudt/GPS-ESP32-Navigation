@@ -18,23 +18,15 @@ class HomeFragment : Fragment() {
 
     // --- Clés SharedPreferences ---
     private val PREFS_NAME = "app_navigation_prefs"
-    private val KEY_PROFILES_JSON = "profiles_json"       // JSON listant les Profile
-    private val KEY_CURRENT_PROFILE = "current_profile"   // Nom du profil actif
+    private val KEY_PROFILES_JSON = "profiles_json"
+    private val KEY_CURRENT_PROFILE = "current_profile"
 
-    // Le Spinner affichant uniquement les noms + “Ajouter…”
     private lateinit var spinnerProfiles: Spinner
     private lateinit var adapterProfiles: ArrayAdapter<String>
-
-    // Liste réelle d’objets Profile
     private var profilesList: MutableList<Profile> = mutableListOf()
 
-    // Ligne spéciale dans le Spinner pour déclencher “Ajouter un profil…”
     private val FOOTER_ADD = "➕ Ajouter un profil…"
-
-    // Index de la sélection précédente (avant “Ajouter…”)
     private var lastSelectedIndex = 0
-
-    // ImageView sous le Spinner pour l’icône du véhicule
     private lateinit var ivVehicleIcon: ImageView
 
     private val prefs by lazy {
@@ -91,7 +83,7 @@ class HomeFragment : Fragment() {
                 // Aucune entrée → on force sur “➕ Ajouter…”
                 spinnerProfiles.setSelection(displayNames.size - 1)
                 lastSelectedIndex = displayNames.size - 1
-                ivVehicleIcon.setImageResource(R.drawable.ic_motorbike)
+                ivVehicleIcon.setImageResource(R.mipmap.ic_profile_default_image_foreground)
             }
         }
 
@@ -198,11 +190,11 @@ class HomeFragment : Fragment() {
      */
     private fun updateVehicleIcon(profile: Profile) {
         val resId = when {
-            profile.type.equals("Moto", ignoreCase = true) -> R.drawable.ic_motorbike
-            profile.type.equals("Voiture", ignoreCase = true) -> R.drawable.ic_car
-            profile.type.equals("Trottinette", ignoreCase = true) -> R.drawable.ic_motocross
+            profile.type.equals("Moto", ignoreCase = true) -> R.mipmap.ic_profile_default_image_foreground
+            profile.type.equals("Voiture", ignoreCase = true) -> R.mipmap.ic_profile_default_image_foreground
+            profile.type.equals("Trottinette", ignoreCase = true) -> R.mipmap.ic_profile_default_image_foreground
 
-            else -> R.drawable.ic_motorbike
+            else -> R.mipmap.ic_profile_default_image_foreground
         }
         ivVehicleIcon.setImageResource(resId)
     }

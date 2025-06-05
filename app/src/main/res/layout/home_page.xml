@@ -8,37 +8,34 @@
     android:padding="16dp"
     android:background="@color/black">
 
-    <!-- Seul Spinner en haut, affichant le profil courant -->
     <Spinner
         android:id="@+id/spinner_profiles"
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:popupBackground="#3A3A3A"
+        android:popupBackground="#282828"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:spinnerMode="dropdown"
-        android:backgroundTint="#FFEB3B"
-        />
+        android:backgroundTint="#FFEB3B"/>
 
-    <!-- ImageView pour afficher l’icône du véhicule -->
     <ImageView
         android:id="@+id/iv_vehicle_icon"
-        android:layout_width="120dp"
-        android:layout_height="120dp"
+        android:layout_width="match_parent"
+        android:layout_height="300dp"
         android:layout_marginTop="16dp"
-        android:contentDescription="Icône du véhicule"
+        android:background="@drawable/rounded_wellow_background"
+        android:contentDescription="@string/image_du_v_hicule"
         app:layout_constraintTop_toBottomOf="@id/spinner_profiles"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:src="@drawable/ic_motorbike"/>
+        android:src="@mipmap/ic_profile_default_image_foreground"/>
 
-    <!-- (Optionnel) Espace pour d’autres contenus retour+page1 -->
     <FrameLayout
         android:id="@+id/fragment_page1_extra"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:layout_constraintTop_toBottomOf="@id/spinner_profiles"
+        app:layout_constraintTop_toBottomOf="@id/iv_vehicle_icon"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
