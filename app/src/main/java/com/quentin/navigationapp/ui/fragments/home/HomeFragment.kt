@@ -1,4 +1,4 @@
-package com.quentin.navigationapp
+package com.quentin.navigationapp.ui.fragments.home
 
 import android.content.Context
 import android.os.Bundle
@@ -8,23 +8,11 @@ import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import com.quentin.navigationapp.R
+import com.quentin.navigationapp.model.Profile
+import com.quentin.navigationapp.model.VehicleSubType
 import org.json.JSONArray
 import org.json.JSONObject
-
-// Data class pour stocker l’ensemble des infos d’un profil
-data class Profile(
-    val name: String,
-    val type: String,
-    val subType: VehicleSubType,
-    val consumption: Double
-)
-
-data class VehicleSubType(
-    val label: String,
-    val routingType: String
-){
-    override fun toString(): String = label
-}
 
 class HomeFragment : Fragment() {
 

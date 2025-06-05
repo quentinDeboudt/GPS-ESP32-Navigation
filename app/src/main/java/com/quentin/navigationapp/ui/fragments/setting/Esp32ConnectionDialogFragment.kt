@@ -1,4 +1,4 @@
-package com.quentin.navigationapp
+package com.quentin.navigationapp.ui.fragments.setting
 
 import android.Manifest
 import android.app.AlertDialog
@@ -8,21 +8,18 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.net.wifi.WifiManager
-import android.os.Build
 import android.os.Bundle
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.ListView
 import android.widget.RadioButton
 import android.widget.Toast
-import androidx.annotation.RequiresApi
 import androidx.annotation.RequiresPermission
 import androidx.fragment.app.DialogFragment
+import com.quentin.navigationapp.R
 
-
-class DeviceConnectDialogFragment : DialogFragment() {
+class Esp32ConnectionDialogFragment : DialogFragment() {
 
     private lateinit var bluetoothAdapter: BluetoothAdapter
     private lateinit var wifiManager: WifiManager
@@ -77,7 +74,8 @@ class DeviceConnectDialogFragment : DialogFragment() {
             deviceListView.adapter = null
         } else {
             val noms = appareils.map { "${it.name ?: "Inconnu"} (${it.address})" }
-            deviceListView.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, noms)
+            deviceListView.adapter =
+                ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, noms)
         }
     }
 
@@ -98,14 +96,16 @@ class DeviceConnectDialogFragment : DialogFragment() {
                     Toast.makeText(context, "Aucun appareil Bluetooth appairé trouvé.", Toast.LENGTH_SHORT).show()
                     deviceListView.adapter = null
                 } else {
-                    deviceListView.adapter = ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, noms)
+                    deviceListView.adapter =
+                        ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, noms)
                     requireContext().unregisterReceiver(this)
                 }
             }
         }
 
-        requireContext().registerReceiver(receiver, IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION))
+        requireContext().registerReceiver(receiver,
+            IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
+        )
         wifiManager.startScan()
     }
 }
-

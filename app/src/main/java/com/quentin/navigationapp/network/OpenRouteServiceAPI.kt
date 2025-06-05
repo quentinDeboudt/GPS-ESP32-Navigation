@@ -1,21 +1,9 @@
 package com.quentin.navigationapp.network
 
-import com.quentin.navigationapp.model.DirectionsResponse
-import okhttp3.Response
-import retrofit2.http.Body
-import retrofit2.http.Header
-import retrofit2.http.POST
 import retrofit2.http.GET
 import retrofit2.http.Query
 
 interface OpenRouteServiceAPI {
-
-    @POST("v2/directions/driving-car/geojson")
-    suspend fun getDirections(
-        @Header("Authorization") apiKey: String,
-        @Body request: DirectionsRequest,
-    ): DirectionsResponse
-
 
     @GET("route")
     suspend fun getRoute(

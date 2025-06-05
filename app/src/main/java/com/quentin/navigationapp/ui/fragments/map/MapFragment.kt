@@ -1,4 +1,4 @@
-package com.quentin.navigationapp
+package com.quentin.navigationapp.ui.fragments.map
 
 import android.Manifest
 import android.animation.ValueAnimator
@@ -7,8 +7,10 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.hardware.SensorManager
+import android.location.Address
 import android.location.Geocoder
 import android.location.Location
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -18,11 +20,14 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.*
+import com.google.android.gms.maps.model.LatLng
+import com.quentin.navigationapp.ui.fragments.setting.Esp32ConnectionDialogFragment
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -37,16 +42,15 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import com.quentin.navigationapp.data.NavigationService
+import com.quentin.navigationapp.model.NavigationInstruction
+import com.quentin.navigationapp.model.Profile
+import com.quentin.navigationapp.model.VehicleSubType
 import com.quentin.navigationapp.network.Path
+import kotlinx.coroutines.delay
+import org.json.JSONArray
 import java.io.IOException
 import java.util.Locale
 import kotlin.math.*
-
-data class NavigationInstruction(
-    val message: String,
-    val location: GeoPoint,
-    val arrow: Drawable? = null
-)
 
 class MapFragment : Fragment() {
 
@@ -64,7 +68,6 @@ class MapFragment : Fragment() {
     private lateinit var btnFinishNavigation: Button
     private lateinit var layoutFilter: LinearLayout
     private lateinit var btnOpenModal: Button
-    private lateinit var speedSpinner: Spinner
     private lateinit var searchNavigationButton: Button
 
     // Navigation variables
@@ -82,7 +85,7 @@ class MapFragment : Fragment() {
     private lateinit var currentDestination: GeoPoint
     private var routePoints: List<GeoPoint> = emptyList()
     private lateinit var arrowMarker: Marker
-    private var arrowIcon: Int = R.drawable.ic_arrow_motorbike
+    private var arrowIcon: Int = com.quentin.navigationapp.R.drawable.ic_arrow_motorbike
     private var vehicle: String = "car"
     private var weightings: String = "fastest"
     private var lastVectorPath: MutableList<GeoPoint> = mutableListOf()
@@ -97,20 +100,6 @@ class MapFragment : Fragment() {
     private val KEY_PROFILES_JSON = "profiles_json"
     private val KEY_CURRENT_PROFILE = "current_profile"
 
-    data class Profile(
-        val name: String,
-        val type: String,
-        val subType: VehicleSubType,
-        val consumption: Double
-    )
-
-    data class VehicleSubType(
-        val label: String,
-        val routingType: String
-    ){
-        override fun toString(): String = label
-    }
-
     /**
      * loadProfilesFromPrefs
      * Load the profiles from the shared preferences.
@@ -120,7 +109,7 @@ class MapFragment : Fragment() {
     private fun loadProfilesFromPrefs(context: Context): List<Profile> {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val jsonString = prefs.getString(KEY_PROFILES_JSON, null) ?: return emptyList()
-        val jsonArray = org.json.JSONArray(jsonString)
+        val jsonArray = JSONArray(jsonString)
         val list = mutableListOf<Profile>()
         for (i in 0 until jsonArray.length()) {
             val obj = jsonArray.getJSONObject(i)
@@ -152,7 +141,6 @@ class MapFragment : Fragment() {
         return prefs.getString(KEY_CURRENT_PROFILE, null)
     }
 
-
     /**
      * getCurrentProfile
      * get the current profile from the shared preferences.
@@ -181,7 +169,7 @@ class MapFragment : Fragment() {
             }
 
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L)
-                .setMinUpdateIntervalMillis(500L) // 0,5 seconde
+                .setMinUpdateIntervalMillis(500L) // 0,5 second
                 .build()
 
             val callback = object : LocationCallback() {
@@ -229,8 +217,7 @@ class MapFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        // On gonfle le layout complet de la page 2
-        return inflater.inflate(R.layout.map_page, container, false)
+        return inflater.inflate(com.quentin.navigationapp.R.layout.map_page, container, false)
     }
 
     /**
@@ -249,8 +236,8 @@ class MapFragment : Fragment() {
 
             Toast.makeText(
                 requireContext(),
-                "Profil actuel : ${currentProfile!!.name} (${currentProfile!!.type} - ${currentProfile!!.subType})",
-                Toast.LENGTH_LONG
+                "Profil actuel: ${currentProfile!!.name}",
+                Toast.LENGTH_SHORT
             ).show()
 
             vehicle = currentProfile!!.subType.routingType
@@ -262,19 +249,19 @@ class MapFragment : Fragment() {
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
         sensorManager = requireActivity().getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
-        mapView = view.findViewById(R.id.map)
-        tvInstruction = view.findViewById(R.id.tvInstruction)
-        arrowImageView = view.findViewById(R.id.arrowImageView)
-        tvDestination = view.findViewById(R.id.etDestination)
-        layoutInstruction = view.findViewById(R.id.layout_instruction)
-        layoutControl = view.findViewById(R.id.layout_control)
-        navigationTime = view.findViewById(R.id.navigation_time)
-        navigationDistance = view.findViewById(R.id.navigation_distance)
-        btnStartNavigation = view.findViewById(R.id.btnStartNavigation)
-        layoutNavigationInput = view.findViewById(R.id.layout_navigation_Input)
-        btnFinishNavigation = view.findViewById(R.id.btnFinishNavigation)
-        btnOpenModal = view.findViewById(R.id.btnOpenModal)
-        searchNavigationButton = view.findViewById(R.id.searchNavigationButton)
+        mapView = view.findViewById(com.quentin.navigationapp.R.id.map)
+        tvInstruction = view.findViewById(com.quentin.navigationapp.R.id.tvInstruction)
+        arrowImageView = view.findViewById(com.quentin.navigationapp.R.id.arrowImageView)
+        tvDestination = view.findViewById(com.quentin.navigationapp.R.id.etDestination)
+        layoutInstruction = view.findViewById(com.quentin.navigationapp.R.id.layout_instruction)
+        layoutControl = view.findViewById(com.quentin.navigationapp.R.id.layout_control)
+        navigationTime = view.findViewById(com.quentin.navigationapp.R.id.navigation_time)
+        navigationDistance = view.findViewById(com.quentin.navigationapp.R.id.navigation_distance)
+        btnStartNavigation = view.findViewById(com.quentin.navigationapp.R.id.btnStartNavigation)
+        layoutNavigationInput = view.findViewById(com.quentin.navigationapp.R.id.layout_navigation_Input)
+        btnFinishNavigation = view.findViewById(com.quentin.navigationapp.R.id.btnFinishNavigation)
+        btnOpenModal = view.findViewById(com.quentin.navigationapp.R.id.btnOpenModal)
+        searchNavigationButton = view.findViewById(com.quentin.navigationapp.R.id.searchNavigationButton)
 
         btnStartNavigation.visibility = View.GONE
         btnFinishNavigation.visibility = View.GONE
@@ -331,10 +318,9 @@ class MapFragment : Fragment() {
                         currentPosition = GeoPoint(location.latitude, location.longitude)
                         updateArrowOverlay(location)
 
-                        if (isFarFromRoute(currentPosition, routePoints, maxDistanceMeters = 100.0)) {
+                        if (isFarFromRoute(currentPosition, routePoints)) {
                             routeRecalculation()
                         }
-                        displayLastPathPolyline()
                         updateRemainingNavigation(
                             currentPoint = currentPosition,
                             plannedRoutePoints = routePoints,
@@ -360,11 +346,10 @@ class MapFragment : Fragment() {
 
         // open dialog connection wifi/bluetooth
         btnOpenModal.setOnClickListener {
-            val dialog = DeviceConnectDialogFragment()
+            val dialog = Esp32ConnectionDialogFragment()
             dialog.show(parentFragmentManager, "DeviceConnectDialog")
         }
     }
-
 
     /**
      * getCurrentPosition
@@ -392,23 +377,51 @@ class MapFragment : Fragment() {
     @RequiresPermission(allOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION])
     private fun getCoordinatesFromAddress(address: String) {
         val geocoder = Geocoder(requireContext())
-        try {
-            val resultList = geocoder.getFromLocationName(address, 1) ?: emptyList()
-            if (resultList.isNotEmpty()) {
-                val loc = resultList[0]
-                val destinationLatLng = com.google.android.gms.maps.model.LatLng(
-                    loc.latitude.takeIf { !it.isNaN() } ?: 0.0,
-                    loc.longitude.takeIf { !it.isNaN() } ?: 0.0
-                )
-                currentDestination = GeoPoint(destinationLatLng.latitude, destinationLatLng.longitude)
-                displayAddress(loc.getAddressLine(0).orEmpty())
-                getDirections(destinationLatLng)
-            } else {
-                Toast.makeText(requireContext(), "Adresse non trouvée", Toast.LENGTH_SHORT).show()
-            }
-        } catch (e: IOException) {
-            e.printStackTrace()
-            Toast.makeText(requireContext(), "Erreur de géocodification", Toast.LENGTH_SHORT).show()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            geocoder.getFromLocationName(
+                address,
+                1,
+                object : Geocoder.GeocodeListener {
+                    override fun onGeocode(resultList: MutableList<Address>) {
+                        requireActivity().runOnUiThread {
+                            handleGeocodeResult(resultList)
+                        }
+                    }
+
+                    override fun onError(errorMessage: String?) {
+                        requireActivity().runOnUiThread {
+                            Toast.makeText(
+                                requireContext(),
+                                "Erreur de géocodification : $errorMessage",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    /**
+     * handleGeocodeResult
+     * Handles the result of the geocoding.
+     * @param resultList The list of results.
+     * @calls displayAddress
+     * @calls getDirections
+     */
+    private fun handleGeocodeResult(resultList: List<Address>) {
+        if (resultList.isNotEmpty()) {
+            val loc = resultList[0]
+            val destinationLatLng = LatLng(
+                loc.latitude.takeIf { !it.isNaN() } ?: 0.0,
+                loc.longitude.takeIf { !it.isNaN() } ?: 0.0
+            )
+            currentDestination = GeoPoint(destinationLatLng.latitude, destinationLatLng.longitude)
+            displayAddress(loc.getAddressLine(0).orEmpty())
+            getDirections(destinationLatLng)
+        } else {
+            Toast.makeText(requireContext(), "Adresse non trouvée", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -417,10 +430,10 @@ class MapFragment : Fragment() {
      * Retrieves the directions from the current position to the destination.
      * @param destinationLatLng The GPS coordinates of the destination.
      */
-    private fun getDirections(destinationLatLng: com.google.android.gms.maps.model.LatLng) {
+    private fun getDirections(destinationLatLng: LatLng) {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val currentLatLng = com.google.android.gms.maps.model.LatLng(
+                val currentLatLng = LatLng(
                     currentPosition.latitude,
                     currentPosition.longitude
                 )
@@ -428,7 +441,7 @@ class MapFragment : Fragment() {
                 totalMinutes = 0
                 totalKilometers = 0.0
 
-                // Appel à l'API via NavigationService
+                // Call Graphhopper API
                 val response = navigationService.getRoute(currentLatLng, destinationLatLng, vehicle, weightings)
                 val ghResponse: Path? = response.paths.firstOrNull()
 
@@ -441,7 +454,6 @@ class MapFragment : Fragment() {
                         GeoPoint(lat, lon)
                     }
 
-                    // Construction des instructions détaillées
                     ghResponse.instructions.forEach { instr ->
                         val (startIdx, endIdx) = instr.interval
                         val startGeo = geoPointsList[startIdx]
@@ -484,9 +496,15 @@ class MapFragment : Fragment() {
         // Create and add new path on the MapView
         val newPolyline = Polyline().apply {
             setPoints(routePoints)
-            width = 12f
+            width = 10F
+            color = Color.YELLOW
+        }
+        val borderPolyline = Polyline().apply {
+            setPoints(routePoints)
+            width = 13f
             color = Color.BLACK
         }
+        mapView.overlays.add(borderPolyline)
         mapView.overlays.add(newPolyline)
         currentRoutePolyline = newPolyline
 
@@ -508,28 +526,11 @@ class MapFragment : Fragment() {
      * @calls getDirections
      */
     private fun routeRecalculation() {
-        val destLatLng = com.google.android.gms.maps.model.LatLng(
+        val destLatLng = LatLng(
             currentDestination.latitude,
             currentDestination.longitude
         )
         getDirections(destLatLng)
-    }
-
-    /**
-     * displayLastPathPolyline
-     * Displays the last path on the map.
-     */
-    private fun displayLastPathPolyline() {
-        lastVectorPath.add(currentPosition)
-        if (traveledPathPolyline == null) {
-            traveledPathPolyline = Polyline().apply {
-                color = Color.BLACK
-                width = 10f
-                mapView.overlays.add(this)
-            }
-        }
-        traveledPathPolyline!!.setPoints(lastVectorPath)
-        mapView.invalidate()
     }
 
     /**
@@ -553,13 +554,18 @@ class MapFragment : Fragment() {
      */
     private fun getArrowForInstruction(sign: Int?): Drawable? {
         return when (sign) {
-            0 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_straight_bk)
-            -3, -2 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_left_2_bk)
-            -1 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_left_1_bk)
-            3, 2 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_right_2_bk)
-            1 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_right_1_bk)
-            7 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_left_1_bk)
-            8 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_right_1_bk)
+            //Tout droit
+            0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_straight_bk)
+            //left
+            -3, -2 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_left_2_bk)
+            -1 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_left_1_bk)
+            //right
+            3, 2 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_right_2_bk)
+            1 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_right_1_bk)
+            //Sail on the left (keep the left lane)
+            7 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_left_1_bk)
+            //Sail on the right (keep the right lane)
+            8 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_right_1_bk)
             else -> null
         }
     }
@@ -574,14 +580,14 @@ class MapFragment : Fragment() {
         val safeBearing = bearing ?: 0.0
         val angleDeg = Math.toDegrees(safeBearing)
         return when (angleDeg) {
-            in -70.0..0.0 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_roundabout_r1_bk)
-            in -120.0..-70.0 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_roundabout_r2_bk)
-            in -170.0..-120.0 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_roundabout_r3_bk)
-            in -190.0..-170.0 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_roundabout_r4_bk)
-            in -230.0..-190.0 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_roundabout_r5_bk)
-            in -280.0..-230.0 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_roundabout_r6_bk)
-            in -340.0..-280.0 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_roundabout_r7_bk)
-            in -360.0..-340.0 -> ContextCompat.getDrawable(requireContext(), R.drawable.nav_roundabout_r8_bk)
+            in -70.0..0.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r1_bk)
+            in -120.0..-70.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r2_bk)
+            in -170.0..-120.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r3_bk)
+            in -190.0..-170.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r4_bk)
+            in -230.0..-190.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r5_bk)
+            in -280.0..-230.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r6_bk)
+            in -340.0..-280.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r7_bk)
+            in -360.0..-340.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r8_bk)
             else -> null
         }
     }
@@ -613,7 +619,7 @@ class MapFragment : Fragment() {
      */
     private fun navigationStopView() {
         val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
-        params.topMargin = (200 * resources.displayMetrics.density).toInt() // ~150dp
+        params.topMargin = (200 * resources.displayMetrics.density).toInt()
         mapView.layoutParams = params
 
         btnFinishNavigation.visibility = View.GONE
@@ -712,11 +718,11 @@ class MapFragment : Fragment() {
     private fun checkInstructionTrigger(currentLocation: GeoPoint, deviceHeading: Float) {
         if (instructions.isEmpty()) return
 
-        val announceDistance = 80.0
-        val minDistanceToFire = 20.0
-        val maxAngleDiff = 90.0
+        val announceDistance = 80.0 //Announced distance in meters
+        val minDistanceToFire = 40.0 //Minimum distance to fire in meters
+        val maxAngleDiff = 90.0 //Maximum angle difference in degrees
 
-        // Find upcoming instructions
+        //Step One: Filter the upcoming instructions
         val upcoming = instructions
             .mapIndexed { idx, instr -> idx to instr }
             .filter { (idx, _) -> idx > lastDisplayedInstructionIndex }
@@ -727,11 +733,11 @@ class MapFragment : Fragment() {
                 abs(normalizeBearingDiff(bearingToInstr - deviceHeading)) < maxAngleDiff
             }
 
-        // Display instruction (straight destination)
+        //Second step: Show the instruction
         if (upcoming.isEmpty()) {
             tvInstruction.text = ""
             arrowImageView.setImageDrawable(
-                ContextCompat.getDrawable(requireContext(), R.drawable.nav_straight_bk)
+                ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_straight_bk)
             )
             return
         }
@@ -739,13 +745,15 @@ class MapFragment : Fragment() {
         val (closestIdx, closestInstr) = upcoming.minByOrNull { (_, instr) ->
             currentLocation.distanceToAsDouble(instr.location)
         }!!
-
         val distance = currentLocation.distanceToAsDouble(closestInstr.location)
 
+        //Third step: display then next instruction
         when {
+            //pre-announcement:
             distance < announceDistance && closestIdx == lastDisplayedInstructionIndex + 1 -> {
                 showInstruction(closestInstr)
             }
+            //action performed:
             distance < minDistanceToFire -> {
                 lastDisplayedInstructionIndex = closestIdx
                 if (lastDisplayedInstructionIndex + 1 < instructions.size) {
@@ -760,7 +768,7 @@ class MapFragment : Fragment() {
                 }
                 tvInstruction.text = displayDist
                 arrowImageView.setImageDrawable(
-                    ContextCompat.getDrawable(requireContext(), R.drawable.nav_straight_bk)
+                    ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_straight_bk)
                 )
             }
         }
@@ -785,6 +793,10 @@ class MapFragment : Fragment() {
     private fun showInstruction(instr: NavigationInstruction) {
         arrowImageView.setImageDrawable(instr.arrow)
         tvInstruction.text = instr.message
+
+        lifecycleScope.launch {
+            delay(2000L) // Wait 2 seconds
+        }
     }
 
     /**
@@ -828,11 +840,11 @@ class MapFragment : Fragment() {
      * Checks if the current position is far from the route.
      * @param current The current position.
      * @param routePoints The list of route points.
-     * @param maxDistanceMeters The maximum distance from the route.
      * @return True if the current position is far from the route, false otherwise.
      * @calls distanceToSegment
      */
-    private fun isFarFromRoute(current: GeoPoint, routePoints: List<GeoPoint>, maxDistanceMeters: Double = 30.0): Boolean {
+    private fun isFarFromRoute(current: GeoPoint, routePoints: List<GeoPoint>): Boolean {
+        val maxDistanceMeters = 30.0
         if (routePoints.size < 2) return true
         val minDist = routePoints.zipWithNext().minOfOrNull { (start, end) ->
             distanceToSegment(current, start, end)
@@ -915,7 +927,7 @@ class MapFragment : Fragment() {
             mapView.invalidate()
         }
         arrowMarker = Marker(mapView).apply {
-            icon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_dafault_arrow)
+            icon = ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.ic_dafault_arrow)
             setAnchor(Marker.ANCHOR_TOP, Marker.ANCHOR_TOP)
         }
         mapView.overlays.add(arrowMarker)
@@ -942,7 +954,7 @@ class MapFragment : Fragment() {
     private fun requestPermissionsIfNeeded(onGranted: () -> Unit) {
         val perms = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
         val launcher = registerForActivityResult(
-            androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+            ActivityResultContracts.RequestMultiplePermissions()
         ) { results ->
             if (results.values.all { it }) onGranted()
         }

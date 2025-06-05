@@ -4,6 +4,10 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.quentin.navigationapp.ui.fragments.favoriteRoutes.FavoritesFragment
+import com.quentin.navigationapp.ui.fragments.home.HomeFragment
+import com.quentin.navigationapp.ui.fragments.map.MapFragment
+import com.quentin.navigationapp.ui.fragments.setting.SettingFragment
 
 class MainActivity : AppCompatActivity() {
 
