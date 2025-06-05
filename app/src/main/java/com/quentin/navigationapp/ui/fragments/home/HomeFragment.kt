@@ -188,15 +188,21 @@ class HomeFragment : Fragment() {
      * @calls displayProfileInfo
      */
     private fun updateVehicleIcon(profile: Profile) {
-        val resId = when {
-            profile.type.equals("Moto", ignoreCase = true) -> R.mipmap.ic_profile_default_image_foreground
-            profile.type.equals("Voiture", ignoreCase = true) -> R.mipmap.ic_profile_default_image_foreground
-            profile.type.equals("Trottinette", ignoreCase = true) -> R.mipmap.ic_profile_default_image_foreground
 
-            else -> R.mipmap.ic_profile_default_image_foreground
+        if (profile.imageUri == null) {
+            val resId = when {
+                profile.type.equals("Moto", ignoreCase = true) -> R.mipmap.ic_profile_default_image_foreground
+                profile.type.equals("Moto 50cc", ignoreCase = true) -> R.mipmap.scooter
+                profile.type.equals("Voiture", ignoreCase = true) -> R.mipmap.ic_profile_default_image_foreground
+                profile.type.equals("Trottinette", ignoreCase = true) -> R.mipmap.ic_profile_default_image_foreground
+
+                else -> R.mipmap.ic_profile_default_image_foreground
+            }
+
+            ivVehicleIcon.setImageResource(resId)
+        }else {
+            ivVehicleIcon.setImageURI(profile.imageUri)
         }
-
-        ivVehicleIcon.setImageResource(resId)
 
         displayProfileInfo(profile)
     }
@@ -258,14 +264,14 @@ class HomeFragment : Fragment() {
                 VehicleSubType("Enduro", "car"),
                 VehicleSubType("Supermotard", "car"),
                 VehicleSubType("Touring", "car"),
-                VehicleSubType("Cross", "car"),
+                VehicleSubType("Cross", "bike"),
                 VehicleSubType("Café Racer", "car")
             ),
             "Moto 50cc" to listOf(
-                VehicleSubType("Scooter", "scooter"),
-                VehicleSubType("Supermotard", "scooter"),
-                VehicleSubType("Dirt", "car"),
-                VehicleSubType("Mobylette", "scooter")
+                VehicleSubType("Scooter", "bike"),
+                VehicleSubType("Supermotard", "bike"),
+                VehicleSubType("Dirt", "mtb"),
+                VehicleSubType("Mobylette", "bike")
             ),
             "Quad" to listOf(
                 VehicleSubType("Route", "car"),
@@ -283,13 +289,13 @@ class HomeFragment : Fragment() {
                 VehicleSubType("Utilitaire", "car")
             ),
             "Vélo" to listOf(
-                VehicleSubType("VTT", "mtb"),
+                VehicleSubType("VTT", "bike"),
                 VehicleSubType("VTC", "bike"),
                 VehicleSubType("route", "bike")
             ),
             "Trottinette" to listOf(
                 VehicleSubType("Électrique", "bike"),
-                VehicleSubType("Tout-terrain", "mtb")
+                VehicleSubType("Tout-terrain", "bike")
             )
         )
 
