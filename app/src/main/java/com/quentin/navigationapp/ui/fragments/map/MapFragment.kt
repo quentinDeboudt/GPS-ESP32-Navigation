@@ -321,14 +321,7 @@ class MapFragment : Fragment() {
                         if (isFarFromRoute(currentPosition, routePoints)) {
                             routeRecalculation()
                         }
-                        updateRemainingNavigation(
-                            currentPoint = currentPosition,
-                            plannedRoutePoints = routePoints,
-                            originalDistanceMeters = totalKilometers,
-                            originalTimeMs = totalMinutes,
-                            tvDistance = navigationDistance,
-                            tvTime = navigationTime
-                        )
+
                     }
                 }
             }
@@ -518,6 +511,15 @@ class MapFragment : Fragment() {
         // Add navigation arrow
         mapView.overlays.add(arrowMarker)
         mapView.invalidate()
+
+        updateRemainingNavigation(
+            currentPoint = currentPosition,
+            plannedRoutePoints = routePoints,
+            originalDistanceMeters = totalKilometers,
+            originalTimeMs = totalMinutes,
+            tvDistance = navigationDistance,
+            tvTime = navigationTime
+        )
     }
 
     /**
@@ -886,7 +888,7 @@ class MapFragment : Fragment() {
         val remainingTimeMs = (originalTimeMs * ratio).toLong()
         val km = remainingDistance / 1000.0
         tvDistance.text = String.format(Locale.FRANCE, "%.1f km", km)
-        // TODO : afficher le temps restant (format hh:mm ou mm:ss)
+        tvTime.text = String.format(Locale.FRANCE, "00:00", remainingTimeMs)
     }
 
     /**

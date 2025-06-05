@@ -193,6 +193,7 @@ class HomeFragment : Fragment() {
             val resId = when {
                 profile.type.equals("Moto", ignoreCase = true) -> R.mipmap.ic_profile_default_image_foreground
                 profile.type.equals("Moto 50cc", ignoreCase = true) -> R.mipmap.scooter
+                profile.type.equals("Quad", ignoreCase = true) -> R.mipmap.quad
                 profile.type.equals("Voiture", ignoreCase = true) -> R.mipmap.ic_profile_default_image_foreground
                 profile.type.equals("Trottinette", ignoreCase = true) -> R.mipmap.ic_profile_default_image_foreground
 
