@@ -271,12 +271,12 @@ class HomeFragment : Fragment() {
             "Moto 50cc" to listOf(
                 VehicleSubType("Scooter", "bike"),
                 VehicleSubType("Supermotard", "bike"),
-                VehicleSubType("Dirt", "mtb"),
+                VehicleSubType("Dirt", "bike"),
                 VehicleSubType("Mobylette", "bike")
             ),
             "Quad" to listOf(
                 VehicleSubType("Route", "car"),
-                VehicleSubType("Tout-terrain", "mtb")
+                VehicleSubType("Tout-terrain", "bike")
             ),
             "Voiture" to listOf(
                 VehicleSubType("Citadine", "car"),

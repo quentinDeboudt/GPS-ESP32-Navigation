@@ -1,6 +1,7 @@
 package com.quentin.navigationapp.ui.fragments.map
 
 import android.Manifest
+import android.R
 import android.animation.ValueAnimator
 import android.content.Context
 import android.content.pm.PackageManager
@@ -22,18 +23,25 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresPermission
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.model.LatLng
-import com.quentin.navigationapp.ui.fragments.setting.Esp32ConnectionDialogFragment
+import com.quentin.navigationapp.data.NavigationService
+import com.quentin.navigationapp.model.NavigationInstruction
+import com.quentin.navigationapp.model.Profile
+import com.quentin.navigationapp.model.VehicleSubType
+import com.quentin.navigationapp.network.Path
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
@@ -41,15 +49,6 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
-import com.quentin.navigationapp.data.NavigationService
-import com.quentin.navigationapp.model.NavigationInstruction
-import com.quentin.navigationapp.model.Profile
-import com.quentin.navigationapp.model.VehicleSubType
-import com.quentin.navigationapp.network.Path
-import kotlinx.coroutines.delay
-import org.json.JSONArray
-import java.io.IOException
-import java.util.Locale
 import kotlin.math.*
 
 class MapFragment : Fragment() {
@@ -59,15 +58,14 @@ class MapFragment : Fragment() {
     private lateinit var tvInstruction: TextView
     private lateinit var arrowImageView: ImageView
     private lateinit var tvDestination: TextView
-    private lateinit var layoutInstruction: LinearLayout
+    private lateinit var layoutInstruction: ConstraintLayout
     private lateinit var layoutControl: LinearLayout
     private lateinit var navigationTime: TextView
     private lateinit var navigationDistance: TextView
     private lateinit var btnStartNavigation: Button
-    private lateinit var layoutNavigationInput: LinearLayout
+    private lateinit var layoutNavigationInput: ConstraintLayout
     private lateinit var btnFinishNavigation: Button
     private lateinit var layoutFilter: LinearLayout
-    private lateinit var btnOpenModal: Button
     private lateinit var searchNavigationButton: Button
 
     // Navigation variables
@@ -258,9 +256,8 @@ class MapFragment : Fragment() {
         navigationTime = view.findViewById(com.quentin.navigationapp.R.id.navigation_time)
         navigationDistance = view.findViewById(com.quentin.navigationapp.R.id.navigation_distance)
         btnStartNavigation = view.findViewById(com.quentin.navigationapp.R.id.btnStartNavigation)
-        layoutNavigationInput = view.findViewById(com.quentin.navigationapp.R.id.layout_navigation_Input)
+        layoutNavigationInput = view.findViewById(com.quentin.navigationapp.R.id.layout_navigation_input)
         btnFinishNavigation = view.findViewById(com.quentin.navigationapp.R.id.btnFinishNavigation)
-        btnOpenModal = view.findViewById(com.quentin.navigationapp.R.id.btnOpenModal)
         searchNavigationButton = view.findViewById(com.quentin.navigationapp.R.id.searchNavigationButton)
 
         btnStartNavigation.visibility = View.GONE
@@ -335,12 +332,6 @@ class MapFragment : Fragment() {
             navigationJob = null
             displayArrowNavigation(currentPosition)
             navigationStopView()
-        }
-
-        // open dialog connection wifi/bluetooth
-        btnOpenModal.setOnClickListener {
-            val dialog = Esp32ConnectionDialogFragment()
-            dialog.show(parentFragmentManager, "DeviceConnectDialog")
         }
     }
 
@@ -440,8 +431,14 @@ class MapFragment : Fragment() {
 
                 if (ghResponse != null) {
                     val coords = ghResponse.points.coordinates
-                    totalMinutes = ghResponse.time
-                    totalKilometers = ghResponse.distance / 1000.0
+
+                    //time in milliseconds
+                    val timeInMillis = ghResponse.time
+                    totalMinutes = timeInMillis / 1000 / 60
+
+                    //distance in meters
+                    val distanceInMeters = ghResponse.distance
+                    totalKilometers = distanceInMeters / 1000
 
                     val geoPointsList: List<GeoPoint> = coords.map { (lon, lat) ->
                         GeoPoint(lat, lon)
@@ -513,10 +510,8 @@ class MapFragment : Fragment() {
         mapView.invalidate()
 
         updateRemainingNavigation(
-            currentPoint = currentPosition,
-            plannedRoutePoints = routePoints,
             originalDistanceMeters = totalKilometers,
-            originalTimeMs = totalMinutes,
+            originalTime = totalMinutes,
             tvDistance = navigationDistance,
             tvTime = navigationTime
         )
@@ -599,20 +594,12 @@ class MapFragment : Fragment() {
      * Displays the navigation view.
      */
     private fun navigationStartView() {
-        // Ajuster le layout de la carte en haut pour laisser place aux instructions
-        val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
-        params.topMargin = 0
-        mapView.layoutParams = params
         mapView.controller.setZoom(18.0)
 
-        val instrParams = layoutInstruction.layoutParams as ViewGroup.MarginLayoutParams
-        instrParams.topMargin = (15 * resources.displayMetrics.density).toInt()
-        layoutInstruction.layoutParams = instrParams
-
         layoutInstruction.visibility = View.VISIBLE
+        btnFinishNavigation.visibility = View.VISIBLE
         layoutNavigationInput.visibility = View.GONE
         btnStartNavigation.visibility = View.GONE
-        btnFinishNavigation.visibility = View.VISIBLE
     }
 
     /**
@@ -857,38 +844,30 @@ class MapFragment : Fragment() {
     /**
      * updateRemainingNavigation
      * Updates the remaining navigation.
-     * @param currentPoint The current GPS position.
-     * @param plannedRoutePoints The list of planned route points.
      * @param originalDistanceMeters The original distance in meters.
-     * @param originalTimeMs The original time in milliseconds.
+     * @param originalTime The original time in milliseconds.
      * @param tvDistance The distance text view.
      * @param tvTime The time text view.
      */
     private fun updateRemainingNavigation(
-        currentPoint: GeoPoint,
-        plannedRoutePoints: List<GeoPoint>,
         originalDistanceMeters: Double,
-        originalTimeMs: Long,
+        originalTime: Long,
         tvDistance: TextView,
         tvTime: TextView
     ) {
-        if (plannedRoutePoints.size < 2 || originalDistanceMeters <= 0) return
+        // Conversion du temps en heures et minutes
+        val hours = originalTime / 60
+        val minutes = originalTime % 60
 
-        val closestIndex = plannedRoutePoints
-            .mapIndexed { idx, pt -> idx to pt }
-            .minByOrNull { it.second.distanceToAsDouble(currentPoint) }
-            ?.first ?: return
-
-        var remainingDistance = 0.0
-        for (i in closestIndex until plannedRoutePoints.size - 1) {
-            remainingDistance += plannedRoutePoints[i].distanceToAsDouble(plannedRoutePoints[i + 1])
+        val timeFormatted = when {
+            hours > 0 -> "$hours h $minutes min"
+            minutes > 0 -> "$minutes min"
+            else -> "<1 min"
         }
-
-        val ratio = remainingDistance / originalDistanceMeters
-        val remainingTimeMs = (originalTimeMs * ratio).toLong()
-        val km = remainingDistance / 1000.0
-        tvDistance.text = String.format(Locale.FRANCE, "%.1f km", km)
-        tvTime.text = String.format(Locale.FRANCE, "00:00", remainingTimeMs)
+        Log.d("DataNavigation","timeFormatted = $timeFormatted")
+        Log.d("DataNavigation","originalDistanceMeters = $originalDistanceMeters")
+        tvTime.text = timeFormatted
+        tvDistance.text =  String.format("%.1f", originalDistanceMeters)
     }
 
     /**

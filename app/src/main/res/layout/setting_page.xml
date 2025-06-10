@@ -6,13 +6,13 @@
     android:layout_height="match_parent"
     android:background="@android:color/background_dark">
 
-    <!-- Contenu vierge → Ici un simple texte pour la démonstration -->
-    <TextView
-        android:id="@+id/text_page1"
+    <Button
+        android:id="@+id/btnOpenModal"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Page 4 (setting)"
-        android:textColor="@android:color/white"
-        android:textSize="24sp"
-        android:layout_gravity="center"/>
+        android:text="@string/connexion"
+        android:layout_gravity="start|top"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="20dp"
+    />
 </FrameLayout>
