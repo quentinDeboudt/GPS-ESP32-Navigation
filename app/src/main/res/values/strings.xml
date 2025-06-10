@@ -17,4 +17,6 @@
     <string name="se_connecter_l_appareil">Se connecter à l\'appareil</string>
     <string name="connexion">Connexion</string>
     <string name="image_du_v_hicule">Image du véhicule</string>
+    <string name="connexion_un_appareil">Connexion à un appareil</string>
+    <string name="se_connecter_un_appareil">Rechercher un appareil</string>
 </resources>

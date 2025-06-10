@@ -10,7 +10,7 @@
         android:id="@+id/dialogTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Connexion à un appareil"
+        android:text="@string/connexion_un_appareil"
         android:layout_gravity="center_horizontal"
         android:paddingBottom="16dp"/>
 
@@ -25,29 +25,27 @@
             android:id="@+id/radioBluetooth"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Bluetooth"
+            android:text="@string/bluetooth"
             android:checked="true" />
 
         <RadioButton
             android:id="@+id/radioWifi"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Wi-Fi" />
+            android:text="@string/wi_fi" />
     </RadioGroup>
 
     <Button
         android:id="@+id/btnConnect"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Se connecter à un appareil" />
+        android:text="@string/se_connecter_un_appareil" />
 
     <ListView
         android:id="@+id/device_list"
         android:layout_width="match_parent"
         android:layout_height="200dp"
         android:layout_marginTop="16dp"/>
-
-
 </LinearLayout>
 
 

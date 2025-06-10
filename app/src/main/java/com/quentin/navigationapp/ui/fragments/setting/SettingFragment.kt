@@ -27,7 +27,4 @@ class SettingFragment : Fragment() {
             dialog.show(parentFragmentManager, "DeviceConnectDialog")
         }
     }
-
-
-
 }
