@@ -15,7 +15,7 @@ L'**application de navigation GPS** Android permet:
 - [x] **Affichage du nombre total de kilomètres à parcourir**
 - [x] **Estimation du temps de trajet**
 - [x] Changer le type de véhicule (vélo, scooter, moto, voiture)
-- [ ] **Estimation de l’heure d’arrivée (ETA)**
+- [x] **Estimation de l’heure d’arrivée (ETA)**
 
 - [ ] Pré-envoi des **tuiles cartographiques** et du **tracé vectoriel** complet vers l’ESP-32 **avant le démarrage**
 - [ ] Gestion du protocole **BLE** (Bluetooth Low Energy) sur l’ESP-32 pour réception des données

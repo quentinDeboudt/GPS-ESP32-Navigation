@@ -52,7 +52,7 @@
 - 
 <img src="images/Exploded_view_drawing.png" width="400"/>
 
-c
+
 ## ✏️ ESP32 Project – Aperçus de l'interface utilisateur. (Mockup)
 1. Connexion au téléphone via Bluetooth.
 2. Écran de préchargement des données.
