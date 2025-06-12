@@ -27,6 +27,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresPermission
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
+import androidx.core.view.isGone
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.*
@@ -478,7 +479,7 @@ class MapFragment : Fragment() {
                     displayVectorPath(geoPointsList)
                 }
             } catch (e: Exception) {
-                Log.e("API", "Erreur: $e")
+                Log.e("APIGraphHopper", "Erreur: $e")
             }
         }
     }
@@ -871,10 +872,13 @@ class MapFragment : Fragment() {
         }
 
         //Distance:
-        val Distance = String.format("%.0f", originalDistanceMeters).toString()
+        val originalDistanceMeters = String.format("%.0f", originalDistanceMeters).toString()
+        val distance = "$originalDistanceMeters km"
 
-        tvTime.text = timeFormatted
-        tvDistance.text =  "$Distance km"
+        requireActivity().runOnUiThread {
+            tvDistance.text = distance
+            tvTime.text = timeFormatted
+        }
     }
 
     /**

@@ -74,7 +74,7 @@
             android:text="@string/time"
             android:textSize="11sp"
             android:padding="16dp"
-            android:color="#FFFFFF"
+            android:textColor="#FFFFFF"
             android:gravity="center" />
 
         <ImageView
@@ -90,7 +90,7 @@
             android:text="@string/distance"
             android:textSize="11sp"
             android:padding="16dp"
-            android:color="#FFFFFF"
+            android:textColor="#FFFFFF"
             android:gravity="center" />
     </LinearLayout>
 
@@ -102,7 +102,7 @@
         android:layout_width="50dp"
         android:layout_height="wrap_content"
         android:background="@drawable/rounded_black_background"
-        android:drawableStart="@drawable/osm_ic_follow_me"
+        android:drawableStart="@drawable/stop_navigation"
         android:textColor="@android:color/white"
         android:contentDescription="@string/stop_navigation_description" />
 
