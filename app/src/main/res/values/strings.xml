@@ -8,8 +8,8 @@
     <string name="destination">📍Destination</string>
     <string name="search">Search</string>
     <string name="select_your_vehicle">Select your vehicle</string>
-    <string name="time">10 min</string>
-    <string name="distance">10 km</string>
+    <string name="time">... min</string>
+    <string name="distance">... km</string>
     <string name="start_navigation_description">Start navigation\n</string>
     <string name="stop_navigation_description">stop navigation</string>
     <string name="wi_fi">Wi-Fi</string>

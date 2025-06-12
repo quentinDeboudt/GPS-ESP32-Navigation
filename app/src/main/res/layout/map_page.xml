@@ -40,7 +40,7 @@
 
         <Button
             android:id="@+id/searchNavigationButton"
-            android:layout_width="wrap_content"
+            android:layout_width="30dp"
             android:layout_height="match_parent"
             android:background="@drawable/rounded_black_background"
             android:drawableStart="@drawable/ic_search"
@@ -97,10 +97,11 @@
     <!-- Bouton pour arreter la navigation -->
     <Button
         android:id="@+id/btnFinishNavigation"
-        android:layout_gravity="end|center_vertical"
-        android:layout_width="71dp"
+        android:layout_marginBottom="70dp"
+        android:layout_gravity="end|bottom"
+        android:layout_width="50dp"
         android:layout_height="wrap_content"
-        android:backgroundTint="@color/black"
+        android:background="@drawable/rounded_black_background"
         android:drawableStart="@drawable/osm_ic_follow_me"
         android:textColor="@android:color/white"
         android:contentDescription="@string/stop_navigation_description" />
@@ -108,10 +109,11 @@
     <!-- Bouton pour lancer la navigation -->
     <Button
         android:id="@+id/btnStartNavigation"
-        android:layout_width="71dp"
+        android:layout_width="50dp"
         android:layout_height="wrap_content"
-        android:layout_gravity="end|center_vertical"
-        android:backgroundTint="@color/black"
+        android:layout_marginBottom="70dp"
+        android:layout_gravity="end|bottom"
+        android:background="@drawable/rounded_black_background"
         android:contentDescription="@string/start_navigation_description"
         android:drawableStart="@drawable/round_navigation_white_48"
         android:textColor="@android:color/white" />
