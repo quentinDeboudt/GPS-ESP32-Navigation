@@ -186,7 +186,6 @@ class HomeFragment : Fragment() {
      * @param profileName : String
      */
     fun deleteProfile(profileName: String) {
-        Log.d("deleteProfile", "deleteProfile: $profileName")
         val updatedProfiles = profilesList.filter { it.name != profileName }
         saveProfiles(updatedProfiles)
 

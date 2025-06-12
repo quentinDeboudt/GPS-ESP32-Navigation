@@ -480,6 +480,11 @@ class MapFragment : Fragment() {
                 }
             } catch (e: Exception) {
                 Log.e("APIGraphHopper", "Erreur: $e")
+                Toast.makeText(
+                    requireContext(),
+                    "Errure de la requête: $e",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
     }
