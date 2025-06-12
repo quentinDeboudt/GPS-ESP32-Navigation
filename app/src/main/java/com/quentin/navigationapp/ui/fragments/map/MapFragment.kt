@@ -1,8 +1,6 @@
 package com.quentin.navigationapp.ui.fragments.map
 
 import android.Manifest
-import android.R
-import android.R.style
 import android.animation.ValueAnimator
 import android.app.AlertDialog
 import android.content.Context
@@ -27,7 +25,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresPermission
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
-import androidx.core.view.isGone
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.*
@@ -53,6 +50,7 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import kotlin.math.*
+import com.quentin.navigationapp.util.BluetoothManager
 
 class MapFragment : Fragment() {
 
@@ -736,6 +734,11 @@ class MapFragment : Fragment() {
             //arrowImageView.setImageDrawable(
             //    ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_straight_bk)
             //)
+            if (BluetoothManager.isConnected()) {
+                BluetoothManager.sendData("Message prêt à l'envoi !")
+            } else {
+                Toast.makeText(context, "Bluetooth non connecté", Toast.LENGTH_SHORT).show()
+            }
             return
         }
 

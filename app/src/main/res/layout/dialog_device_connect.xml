@@ -14,38 +14,12 @@
         android:layout_gravity="center_horizontal"
         android:paddingBottom="16dp"/>
 
-    <!-- Choix du filtre : Bluetooth ou Wi-Fi -->
-    <RadioGroup
-        android:id="@+id/radioGroupFilter"
-        android:orientation="horizontal"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-
-        <RadioButton
-            android:id="@+id/radioBluetooth"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/bluetooth"
-            android:checked="true" />
-
-        <RadioButton
-            android:id="@+id/radioWifi"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/wi_fi" />
-    </RadioGroup>
-
     <Button
-        android:id="@+id/btnConnect"
-        android:layout_width="match_parent"
+        android:id="@+id/btnConnectSend"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/se_connecter_un_appareil" />
-
-    <ListView
-        android:id="@+id/device_list"
-        android:layout_width="match_parent"
-        android:layout_height="200dp"
-        android:layout_marginTop="16dp"/>
+        android:text="Connecter un appareil"
+        />
 </LinearLayout>
 
 
