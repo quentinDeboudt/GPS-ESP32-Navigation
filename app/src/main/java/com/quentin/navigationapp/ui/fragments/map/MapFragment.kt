@@ -2,7 +2,9 @@ package com.quentin.navigationapp.ui.fragments.map
 
 import android.Manifest
 import android.R
+import android.R.style
 import android.animation.ValueAnimator
+import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -54,18 +56,16 @@ import kotlin.math.*
 class MapFragment : Fragment() {
 
     // Widgets du layout
+    private var loadingDialog: AlertDialog? = null
+
     private lateinit var mapView: MapView
-    private lateinit var tvInstruction: TextView
-    private lateinit var arrowImageView: ImageView
     private lateinit var tvDestination: TextView
-    private lateinit var layoutInstruction: ConstraintLayout
     private lateinit var layoutControl: LinearLayout
     private lateinit var navigationTime: TextView
     private lateinit var navigationDistance: TextView
     private lateinit var btnStartNavigation: Button
     private lateinit var layoutNavigationInput: ConstraintLayout
     private lateinit var btnFinishNavigation: Button
-    private lateinit var layoutFilter: LinearLayout
     private lateinit var searchNavigationButton: Button
 
     // Navigation variables
@@ -148,6 +148,22 @@ class MapFragment : Fragment() {
     private fun getCurrentProfile(context: Context): Profile? {
         val currentName = loadCurrentProfileName(context) ?: return null
         return loadProfilesFromPrefs(context).firstOrNull { it.name == currentName }
+    }
+
+    fun showLoadingDialog() {
+        if (loadingDialog?.isShowing == true) return
+
+        val builder = AlertDialog.Builder(requireContext())
+        val inflater = layoutInflater
+        val view = inflater.inflate(com.quentin.navigationapp.R.layout.dialog_loading, null)
+        builder.setView(view)
+        builder.setCancelable(false)
+        loadingDialog = builder.create()
+        loadingDialog?.show()
+    }
+
+    fun hideLoadingDialog() {
+        loadingDialog?.dismiss()
     }
 
     /**
@@ -246,12 +262,8 @@ class MapFragment : Fragment() {
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
         sensorManager = requireActivity().getSystemService(Context.SENSOR_SERVICE) as SensorManager
-
         mapView = view.findViewById(com.quentin.navigationapp.R.id.map)
-        tvInstruction = view.findViewById(com.quentin.navigationapp.R.id.tvInstruction)
-        arrowImageView = view.findViewById(com.quentin.navigationapp.R.id.arrowImageView)
         tvDestination = view.findViewById(com.quentin.navigationapp.R.id.etDestination)
-        layoutInstruction = view.findViewById(com.quentin.navigationapp.R.id.layout_instruction)
         layoutControl = view.findViewById(com.quentin.navigationapp.R.id.layout_control)
         navigationTime = view.findViewById(com.quentin.navigationapp.R.id.navigation_time)
         navigationDistance = view.findViewById(com.quentin.navigationapp.R.id.navigation_distance)
@@ -262,7 +274,6 @@ class MapFragment : Fragment() {
 
         btnStartNavigation.visibility = View.GONE
         btnFinishNavigation.visibility = View.GONE
-        layoutInstruction.visibility = View.GONE
         layoutControl.visibility = View.GONE
 
         getCurrentPosition()
@@ -307,12 +318,15 @@ class MapFragment : Fragment() {
         var navigationJob: Job? = null
         requestPermissionsIfNeeded {
             btnStartNavigation.setOnClickListener {
+                showLoadingDialog()
                 navigationStartView()
                 navigationisStarted(true)
+
 
                 navigationJob = lifecycleScope.launch {
                     locationFlow.collect { location ->
                         currentPosition = GeoPoint(location.latitude, location.longitude)
+
                         updateArrowOverlay(location)
 
                         if (isFarFromRoute(currentPosition, routePoints)) {
@@ -531,19 +545,6 @@ class MapFragment : Fragment() {
     }
 
     /**
-     * formatTime
-     * Formats the time in milliseconds to a string.
-     */
-    private fun formatTime(milliseconds: Long): String {
-        val seconds = milliseconds / 1000
-        val minutes = seconds / 60
-        val hours = minutes / 60
-        val remainingMinutes = minutes % 60
-        val remainingSeconds = seconds % 60
-        return String.format("%02d:%02d:%02d", hours, remainingMinutes, remainingSeconds)
-    }
-
-    /**
      * getArrowForInstruction
      * Gets the arrow icon for the given instruction.
      * @param sign The instruction sign.
@@ -596,7 +597,6 @@ class MapFragment : Fragment() {
     private fun navigationStartView() {
         mapView.controller.setZoom(18.0)
 
-        layoutInstruction.visibility = View.VISIBLE
         btnFinishNavigation.visibility = View.VISIBLE
         layoutNavigationInput.visibility = View.GONE
         btnStartNavigation.visibility = View.GONE
@@ -607,15 +607,13 @@ class MapFragment : Fragment() {
      * Hides the navigation view.
      */
     private fun navigationStopView() {
-        val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
-        params.topMargin = (200 * resources.displayMetrics.density).toInt()
-        mapView.layoutParams = params
+        //val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
+        //params.topMargin = (200 * resources.displayMetrics.density).toInt()
+        //mapView.layoutParams = params
 
         btnFinishNavigation.visibility = View.GONE
         layoutNavigationInput.visibility = View.VISIBLE
-        layoutInstruction.visibility = View.GONE
         btnStartNavigation.visibility = View.VISIBLE
-        layoutFilter.visibility = View.VISIBLE
     }
 
     /**
@@ -636,6 +634,7 @@ class MapFragment : Fragment() {
      * @calls checkInstructionTrigger
      */
     private fun updateArrowOverlay(position: Location) {
+
         val currentGeo = GeoPoint(position.latitude, position.longitude)
         val bearing: Float = position.bearing
 
@@ -646,6 +645,7 @@ class MapFragment : Fragment() {
         animateMapTo(currentGeo, bearing)
         checkInstructionTrigger(currentGeo, bearing)
         lastPosition = position
+        hideLoadingDialog()
     }
 
     /**
@@ -724,10 +724,12 @@ class MapFragment : Fragment() {
 
         //Second step: Show the instruction
         if (upcoming.isEmpty()) {
-            tvInstruction.text = ""
-            arrowImageView.setImageDrawable(
-                ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_straight_bk)
-            )
+            //TODO: display instruction on ESP-32
+
+            //tvInstruction.text = ""
+            //arrowImageView.setImageDrawable(
+            //    ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_straight_bk)
+            //)
             return
         }
 
@@ -755,10 +757,12 @@ class MapFragment : Fragment() {
                 } else {
                     String.format("%.0f m", distance)
                 }
-                tvInstruction.text = displayDist
-                arrowImageView.setImageDrawable(
-                    ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_straight_bk)
-                )
+
+                //TODO: display instruction on ESP-32
+                //tvInstruction.text = displayDist
+                //arrowImageView.setImageDrawable(
+                //    ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_straight_bk)
+                //)
             }
         }
     }
@@ -780,8 +784,9 @@ class MapFragment : Fragment() {
      * @param instr The instruction to display.
      */
     private fun showInstruction(instr: NavigationInstruction) {
-        arrowImageView.setImageDrawable(instr.arrow)
-        tvInstruction.text = instr.message
+        //TODO: display instruction on ESP-32
+        //arrowImageView.setImageDrawable(instr.arrow)
+        //tvInstruction.text = instr.message
 
         lifecycleScope.launch {
             delay(2000L) // Wait 2 seconds
@@ -855,7 +860,7 @@ class MapFragment : Fragment() {
         tvDistance: TextView,
         tvTime: TextView
     ) {
-        // Conversion du temps en heures et minutes
+        // Time:
         val hours = originalTime / 60
         val minutes = originalTime % 60
 
@@ -864,10 +869,12 @@ class MapFragment : Fragment() {
             minutes > 0 -> "$minutes min"
             else -> "<1 min"
         }
-        Log.d("DataNavigation","timeFormatted = $timeFormatted")
-        Log.d("DataNavigation","originalDistanceMeters = $originalDistanceMeters")
+
+        //Distance:
+        val Distance = String.format("%.0f", originalDistanceMeters).toString()
+
         tvTime.text = timeFormatted
-        tvDistance.text =  String.format("%.1f", originalDistanceMeters)
+        tvDistance.text =  "$Distance km"
     }
 
     /**

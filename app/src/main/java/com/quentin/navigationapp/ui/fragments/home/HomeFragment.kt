@@ -15,11 +15,14 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.quentin.navigationapp.R
 import com.quentin.navigationapp.model.Profile
 import com.quentin.navigationapp.model.VehicleSubType
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import org.osmdroid.util.GeoPoint
 
 class HomeFragment : Fragment() {
 
@@ -27,6 +30,7 @@ class HomeFragment : Fragment() {
     private val PREFS_NAME = "app_navigation_prefs"
     private val KEY_PROFILES_JSON = "profiles_json"
     private val KEY_CURRENT_PROFILE = "current_profile"
+    private var currentProfileName: String? = null
 
     private lateinit var spinnerProfiles: Spinner
     private lateinit var adapterProfiles: ArrayAdapter<String>
@@ -35,6 +39,7 @@ class HomeFragment : Fragment() {
     private val FOOTER_ADD = "➕ Ajouter un profil…"
     private var lastSelectedIndex = 0
     private lateinit var ivVehicleIcon: ImageView
+    private lateinit var btnDeletProfil: Button
 
     private val prefs by lazy {
         requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -53,6 +58,8 @@ class HomeFragment : Fragment() {
 
         spinnerProfiles = view.findViewById(R.id.spinner_profiles)
         ivVehicleIcon = view.findViewById(R.id.iv_vehicle_icon)
+        btnDeletProfil = view.findViewById(R.id.btn_Delete_Profile)
+
 
         // 1) Charger tous les profils depuis SharedPreferences (JSON → List<Profile>)
         profilesList = loadProfiles()
@@ -119,6 +126,10 @@ class HomeFragment : Fragment() {
             }
             override fun onNothingSelected(parent: AdapterView<*>) { }
         }
+
+        btnDeletProfil.setOnClickListener {
+            deleteProfile(currentProfileName.toString())
+        }
     }
 
     /** Lit la liste de profils (clé JSON) et la renvoie en MutableList<Profile>. */
@@ -169,6 +180,20 @@ class HomeFragment : Fragment() {
         prefs.edit().putString(KEY_PROFILES_JSON, jsonArray.toString()).apply()
     }
 
+    /**
+     * deleteProfile
+     * delete profile from the list
+     * @param profileName : String
+     */
+    fun deleteProfile(profileName: String) {
+        Log.d("deleteProfile", "deleteProfile: $profileName")
+        val updatedProfiles = profilesList.filter { it.name != profileName }
+        saveProfiles(updatedProfiles)
+
+        Toast.makeText(requireContext(),
+            "Profil \"$profileName\" supprime", Toast.LENGTH_SHORT).show()
+    }
+
     /** Renvoie le nom du profil actif ou null si aucun. */
     private fun loadCurrentProfileName(): String? {
         return prefs.getString(KEY_CURRENT_PROFILE, null)
@@ -213,6 +238,8 @@ class HomeFragment : Fragment() {
      * @param profile : Profile
      */
     private fun displayProfileInfo(profile: Profile) {
+
+        currentProfileName = profile.name.toString()
 
         val gridLayout = view?.findViewById<GridLayout>(R.id.grid_profile_info)
 
