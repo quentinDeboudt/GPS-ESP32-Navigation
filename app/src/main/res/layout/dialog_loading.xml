@@ -3,23 +3,25 @@
     android:layout_height="match_parent"
     android:padding="24dp"
     android:orientation="vertical"
-    android:background="@color/grey_light"
+    android:background="@color/black"
     android:gravity="center">
 
     <ProgressBar
         android:id="@+id/progress_bar"
-        style="?android:attr/progressBarStyleLarge"
-        android:layout_width="wrap_content"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:indeterminate="true"
-        android:layout_marginTop="16dp" />
+        android:layout_marginTop="16dp"
+        android:textColor="@color/yellow"
+        />
 
     <TextView
         android:id="@+id/loading_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Chargement en cours..."
-        android:textColor="@android:color/white"
+        android:textColor="@color/yellow"
         android:textStyle="bold"
         android:layout_marginTop="16dp"
         android:gravity="center"/>
