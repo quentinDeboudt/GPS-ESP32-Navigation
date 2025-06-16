@@ -728,14 +728,9 @@ class MapFragment : Fragment() {
 
         //Second step: Show the instruction
         if (upcoming.isEmpty()) {
-            //TODO: display instruction on ESP-32
-
-            //tvInstruction.text = ""
-            //arrowImageView.setImageDrawable(
-            //    ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_straight_bk)
-            //)
             if (BluetoothManager.isConnected()) {
-                BluetoothManager.sendData("Message prêt à l'envoi !")
+                //TODO: display instruction on ESP-32
+                BluetoothManager.sendData(" Tout droit")
             } else {
                 Toast.makeText(context, "Bluetooth non connecté", Toast.LENGTH_SHORT).show()
             }
@@ -797,6 +792,7 @@ class MapFragment : Fragment() {
         //arrowImageView.setImageDrawable(instr.arrow)
         //tvInstruction.text = instr.message
 
+        BluetoothManager.sendData(instr.message.toString())
         lifecycleScope.launch {
             delay(2000L) // Wait 2 seconds
         }

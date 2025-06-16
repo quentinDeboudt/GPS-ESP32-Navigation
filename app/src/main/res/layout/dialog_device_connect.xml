@@ -1,25 +1,51 @@
-<!-- dialog_connect_device.xml -->
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="24dp">
+xmlns:android="http://schemas.android.com/apk/res/android"
+android:layout_width="match_parent"
+android:layout_height="wrap_content"
+android:orientation="vertical"
+android:padding="24dp"
+android:gravity="center_horizontal">
+
+    <ImageView
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:src="@drawable/ic_settings_bluetooth"
+        android:contentDescription="Bluetooth Icon"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"/>
 
     <TextView
-        android:id="@+id/dialogTitle"
+        android:id="@+id/dialog_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/connexion_un_appareil"
-        android:layout_gravity="center_horizontal"
-        android:paddingBottom="16dp"/>
+        android:text="Connexion Bluetooth"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="@android:color/white"
+        android:layout_marginBottom="12dp"/>
 
+    <TextView
+        android:id="@+id/dialog_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/explain_conect"
+        android:textSize="16sp"
+        android:textColor="@android:color/white"
+        android:layout_marginBottom="24dp"/>
+
+    <!-- RecyclerView pour la liste des appareils -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_ble_devices"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Bouton pour lancer ou relancer le scan -->
     <Button
         android:id="@+id/btnConnectSend"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Connecter un appareil"
-        />
+        android:text="Scanner / Relancer scan" />
+
 </LinearLayout>
-
-
