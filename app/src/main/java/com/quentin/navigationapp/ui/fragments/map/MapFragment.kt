@@ -30,6 +30,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.model.LatLng
 import com.quentin.navigationapp.data.NavigationService
+import com.quentin.navigationapp.model.BleData
 import com.quentin.navigationapp.model.NavigationInstruction
 import com.quentin.navigationapp.model.Profile
 import com.quentin.navigationapp.model.VehicleSubType
@@ -51,6 +52,7 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import kotlin.math.*
 import com.quentin.navigationapp.util.BluetoothManager
+import kotlinx.coroutines.withContext
 
 class MapFragment : Fragment() {
 
@@ -329,11 +331,20 @@ class MapFragment : Fragment() {
                 showLoadingDialog()
                 navigationStartView()
                 navigationisStarted(true)
+                Log.d("debugSendData", "Start navigation: ")
 
 
                 navigationJob = lifecycleScope.launch {
                     locationFlow.collect { location ->
                         currentPosition = GeoPoint(location.latitude, location.longitude)
+
+
+                        if (BluetoothManager.isConnected()) {
+                            Log.d("debugSendData", "Envoie de la Position Actuel")
+                            BluetoothManager.sendData(BleData.CurrentPosition(location.latitude, location.longitude))
+                        } else {
+                            deviceIsConnected()
+                        }
 
                         updateArrowOverlay(location)
 
@@ -470,6 +481,15 @@ class MapFragment : Fragment() {
                 if (ghResponse != null) {
                     val coords = ghResponse.points.coordinates
 
+                    if (BluetoothManager.isConnected()) {
+
+                        Log.d("debugSendData", "VectorPath: ${coords}")
+                        BluetoothManager.sendData(BleData.VectorPath(coords))
+
+                    } else {
+                        deviceIsConnected()
+                    }
+
                     //time in milliseconds
                     val timeInMillis = ghResponse.time
                     totalMinutes = timeInMillis / 1000 / 60
@@ -488,26 +508,25 @@ class MapFragment : Fragment() {
                         val endGeo = geoPointsList[endIdx]
                         val sign = instr.sign
 
-                        val arrowDrawable: Drawable? = if (sign == 6) {
-                            getRoundaboutIconFromBearing(instr.turn_angle)
+                        val arrowCode: Int? = (if (sign == 6) {
+                            getRoundaboutCodeFromBearing(instr.turn_angle)
                         } else {
-                            getArrowForInstruction(sign)
-                        }
+                            sign?.toInt()
+                        })
 
-                        navInstructions += NavigationInstruction(instr.text, startGeo, arrowDrawable)
-                        navInstructions += NavigationInstruction(instr.text, endGeo, arrowDrawable)
+                        navInstructions += NavigationInstruction(instr.text, startGeo, arrowCode?: 0)
+                        navInstructions += NavigationInstruction(instr.text, endGeo, arrowCode?: 0)
                     }
                     instructions = navInstructions
 
                     displayVectorPath(geoPointsList)
                 }
             } catch (e: Exception) {
-                Log.e("APIGraphHopper", "Erreur: $e")
-                Toast.makeText(
-                    requireContext(),
-                    "Errure de la requête: $e",
-                    Toast.LENGTH_LONG
-                ).show()
+                withContext(Dispatchers.Main) {
+                    if (isAdded) {
+                        Toast.makeText(requireContext(), "Erreur de la requête: $e", Toast.LENGTH_LONG).show()
+                    }
+                }
             }
         }
     }
@@ -603,19 +622,19 @@ class MapFragment : Fragment() {
      * @param bearing The bearing.
      * @return The roundabout icon.
      */
-    private fun getRoundaboutIconFromBearing(bearing: Double?): Drawable? {
+    private fun getRoundaboutCodeFromBearing(bearing: Double?): Int {
         val safeBearing = bearing ?: 0.0
         val angleDeg = Math.toDegrees(safeBearing)
         return when (angleDeg) {
-            in -70.0..0.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r1_bk)
-            in -120.0..-70.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r2_bk)
-            in -170.0..-120.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r3_bk)
-            in -190.0..-170.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r4_bk)
-            in -230.0..-190.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r5_bk)
-            in -280.0..-230.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r6_bk)
-            in -340.0..-280.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r7_bk)
-            in -360.0..-340.0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_roundabout_r8_bk)
-            else -> null
+            in -70.0..0.0 -> 10
+            in -120.0..-70.0 -> 11
+            in -170.0..-120.0 -> 12
+            in -190.0..-170.0 -> 13
+            in -230.0..-190.0 -> 14
+            in -280.0..-230.0 -> 15
+            in -340.0..-280.0 -> 16
+            in -360.0..-340.0 -> 16
+            else -> 0
         }
     }
 
@@ -639,8 +658,6 @@ class MapFragment : Fragment() {
         layoutNavigationInput.visibility = View.GONE
         btnStartNavigation.visibility = View.GONE
     }
-
-
 
     /**
      * navigationStopView
@@ -769,10 +786,10 @@ class MapFragment : Fragment() {
         //Second step: Show the instruction
         if (upcoming.isEmpty()) {
             if (BluetoothManager.isConnected()) {
-                //TODO: display instruction on ESP-32
-                BluetoothManager.sendData(" Tout droit")
+                Log.d("debugSendData", "DIRECTION: 0")
+                BluetoothManager.sendData(BleData.Direction(0))
             } else {
-                Toast.makeText(context, "Bluetooth non connecté", Toast.LENGTH_SHORT).show()
+                deviceIsConnected()
             }
             return
         }
@@ -828,11 +845,16 @@ class MapFragment : Fragment() {
      * @param instr The instruction to display.
      */
     private fun showInstruction(instr: NavigationInstruction) {
-        //TODO: display instruction on ESP-32
-        //arrowImageView.setImageDrawable(instr.arrow)
-        //tvInstruction.text = instr.message
 
-        BluetoothManager.sendData(instr.message.toString())
+        if (BluetoothManager.isConnected()) {
+            Log.d("debugSendData", "Direction: ${instr.arrow}")
+            Log.d("debugSendData", "DistanceBeforeDirection: ${instr.message.toInt()}")
+            BluetoothManager.sendData(BleData.Direction(instr.arrow))
+            BluetoothManager.sendData(BleData.DistanceBeforeDirection(50))
+        } else {
+            deviceIsConnected()
+        }
+
         lifecycleScope.launch {
             delay(2000L) // Wait 2 seconds
         }
@@ -1001,4 +1023,16 @@ class MapFragment : Fragment() {
         }
     }
 
+
+    fun deu(){
+        //BluetoothManager.sendData(BleData.Direction(0))
+        //BluetoothManager.sendData(BleData.DistanceBeforeDirection(120))
+        //BluetoothManager.sendData(BleData.KilometersRemaining(3.5))
+        //BluetoothManager.sendData(BleData.TimeRemaining("00:08:45"))
+        //val vectorPoints = listOf(48.85 to 2.35, 48.86 to 2.36)
+        //BluetoothManager.sendData(BleData.VectorPath(vectorPoints))
+    }
+
 }
+
+

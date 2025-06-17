@@ -3,7 +3,10 @@ package com.quentin.navigationapp.util
 import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothGatt
+import android.bluetooth.BluetoothGattCharacteristic
+import android.util.Log
 import androidx.annotation.RequiresPermission
+import com.quentin.navigationapp.model.BleData
 import java.util.UUID
 
 object BluetoothManager {
@@ -19,20 +22,39 @@ object BluetoothManager {
     fun isConnected(): Boolean = connected
 
     @SuppressLint("MissingPermission")
-    fun sendData(text: String) {
-        // Tes UUID par défaut
+    fun sendData(data: BleData) {
+
+        val characteristic = getCharacteristic()
+
+        val message: String = when (data) {
+            is BleData.Direction -> "DIR:${data.code}"
+            is BleData.DistanceBeforeDirection -> "DIST:${data.meters}"
+            is BleData.VectorPath -> "PATH:$data"
+            is BleData.KilometersRemaining -> "KM:${data.km}"
+            is BleData.TimeRemaining -> "TIME:${data.timeText}"
+            is BleData.CurrentPosition -> "POSITION:${data}"
+        }
+
+        if (characteristic != null && connected) {
+           characteristic.value = message.toByteArray(Charsets.UTF_8)
+           gatt?.writeCharacteristic(characteristic)
+            Log.d("BLESend", "Envoyé : $message")
+        } else {
+            Log.w("BLESend", "Erreur : pas connecté ou caractéristique manquante")
+        }
+    }
+
+    fun getCharacteristic(): BluetoothGattCharacteristic? {
+        //UUID par défaut
         val serviceUuid = UUID.fromString("0000abcd-0000-1000-8000-00805f9b34fb")
         val charUuid    = UUID.fromString("0000dcba-0000-1000-8000-00805f9b34fb")
 
-        val characteristic = gatt
+        return gatt
             ?.getService(serviceUuid)
             ?.getCharacteristic(charUuid)
-
-        if (characteristic != null && connected) {
-            characteristic.value = text.toByteArray(Charsets.UTF_8)
-            gatt?.writeCharacteristic(characteristic)
-        }
     }
+
+
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun close() {

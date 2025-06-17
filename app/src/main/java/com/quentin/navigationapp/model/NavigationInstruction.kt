@@ -6,5 +6,5 @@ import org.osmdroid.util.GeoPoint
 data class NavigationInstruction(
     val message: String,
     val location: GeoPoint,
-    val arrow: Drawable? = null
+    val arrow: Int
 )
