@@ -94,6 +94,35 @@
             android:gravity="center" />
     </LinearLayout>
 
+    <LinearLayout
+        android:id="@+id/layout_connexion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start"
+        android:layout_marginStart="10dp"
+        android:layout_marginTop="80dp"
+        android:background="@drawable/rounded_black_background"
+        android:orientation="horizontal"
+        map:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:id="@+id/icon_device"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/icon_device_disconnected" />
+
+        <TextView
+            android:id="@+id/tv_connect_device"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/DeviceConnexion"
+            android:textSize="11sp"
+            android:padding="16dp"
+            android:textColor="#FFFFFF"
+            android:gravity="center" />
+
+    </LinearLayout>
+
     <!-- Bouton pour arreter la navigation -->
     <Button
         android:id="@+id/btnFinishNavigation"

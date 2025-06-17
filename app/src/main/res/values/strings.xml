@@ -22,4 +22,5 @@
     <string name="deleteProfile">Supprimer ce profil</string>
     <string name="connecter_l_appareil">Connecter l\'appareil</string>
     <string name="explain_conect">"Avant de continuer, veuillez d'abord jumeler votre appareil via les paramètres Bluetooth du téléphone. Ensuite, cliquez sur le bouton ci-dessous pour connecter l'application à l'appareil."</string>
+    <string name="DeviceConnexion">Connexion en cours..</string>
 </resources>

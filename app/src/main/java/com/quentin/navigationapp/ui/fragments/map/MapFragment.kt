@@ -56,16 +56,22 @@ class MapFragment : Fragment() {
 
     // Widgets du layout
     private var loadingDialog: AlertDialog? = null
-
     private lateinit var mapView: MapView
     private lateinit var tvDestination: TextView
-    private lateinit var layoutControl: LinearLayout
-    private lateinit var navigationTime: TextView
-    private lateinit var navigationDistance: TextView
     private lateinit var btnStartNavigation: Button
     private lateinit var layoutNavigationInput: ConstraintLayout
     private lateinit var btnFinishNavigation: Button
     private lateinit var searchNavigationButton: Button
+
+    //layout to device connexion
+    private lateinit var layoutConnexion: LinearLayout
+    private lateinit var iconDevice: ImageView
+    private lateinit var tvConnectDevice: TextView
+
+    //layout to information navigation
+    private lateinit var layoutControl: LinearLayout
+    private lateinit var navigationTime: TextView
+    private lateinit var navigationDistance: TextView
 
     // Navigation variables
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -90,7 +96,6 @@ class MapFragment : Fragment() {
     private var isNavigating = false
     private var currentRoutePolyline: Polyline? = null
     private var currentProfile: Profile? = null
-
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 
     private val PREFS_NAME = "app_navigation_prefs"
@@ -149,7 +154,7 @@ class MapFragment : Fragment() {
         return loadProfilesFromPrefs(context).firstOrNull { it.name == currentName }
     }
 
-    fun showLoadingDialog() {
+    private fun showLoadingDialog() {
         if (loadingDialog?.isShowing == true) return
 
         val builder = AlertDialog.Builder(requireContext())
@@ -161,7 +166,7 @@ class MapFragment : Fragment() {
         loadingDialog?.show()
     }
 
-    fun hideLoadingDialog() {
+    private fun hideLoadingDialog() {
         loadingDialog?.dismiss()
     }
 
@@ -264,6 +269,9 @@ class MapFragment : Fragment() {
         mapView = view.findViewById(com.quentin.navigationapp.R.id.map)
         tvDestination = view.findViewById(com.quentin.navigationapp.R.id.etDestination)
         layoutControl = view.findViewById(com.quentin.navigationapp.R.id.layout_control)
+        layoutConnexion = view.findViewById(com.quentin.navigationapp.R.id.layout_connexion)
+        iconDevice = view.findViewById(com.quentin.navigationapp.R.id.icon_device)
+        tvConnectDevice = view.findViewById(com.quentin.navigationapp.R.id.tv_connect_device)
         navigationTime = view.findViewById(com.quentin.navigationapp.R.id.navigation_time)
         navigationDistance = view.findViewById(com.quentin.navigationapp.R.id.navigation_distance)
         btnStartNavigation = view.findViewById(com.quentin.navigationapp.R.id.btnStartNavigation)
@@ -276,6 +284,7 @@ class MapFragment : Fragment() {
         layoutControl.visibility = View.GONE
 
         getCurrentPosition()
+        deviceIsConnected()
 
         //button search navigation
         searchNavigationButton.setOnClickListener {
@@ -365,6 +374,22 @@ class MapFragment : Fragment() {
             }
         }
     }
+
+    /**
+     * deviceIsConnected
+     * Checks if the device is connected.
+     */
+    private fun deviceIsConnected() {
+        if (BluetoothManager.isConnected()) {
+            iconDevice.setImageResource(com.quentin.navigationapp.R.drawable.icon_device_connected)
+            tvConnectDevice.text = "Connecté"
+        } else {
+            iconDevice.setImageResource(com.quentin.navigationapp.R.drawable.icon_device_disconnected)
+            tvConnectDevice.text = "Déconnecté"
+        }
+    }
+
+
 
     /**
      * getCoordinatesFromAddress
@@ -594,6 +619,7 @@ class MapFragment : Fragment() {
         }
     }
 
+
     /**
      * navigationStartView
      * Displays the navigation view.
@@ -601,19 +627,33 @@ class MapFragment : Fragment() {
     private fun navigationStartView() {
         mapView.controller.setZoom(18.0)
 
+        val paramsLayoutControl = layoutControl.layoutParams as ViewGroup.MarginLayoutParams
+        paramsLayoutControl.topMargin = (10 * resources.displayMetrics.density).toInt()
+        layoutControl.layoutParams = paramsLayoutControl
+
+        val paramsLayoutConnexion = layoutConnexion.layoutParams as ViewGroup.MarginLayoutParams
+        paramsLayoutConnexion.topMargin = (10 * resources.displayMetrics.density).toInt()
+        layoutConnexion.layoutParams = paramsLayoutConnexion
+
         btnFinishNavigation.visibility = View.VISIBLE
         layoutNavigationInput.visibility = View.GONE
         btnStartNavigation.visibility = View.GONE
     }
+
+
 
     /**
      * navigationStopView
      * Hides the navigation view.
      */
     private fun navigationStopView() {
-        //val params = mapView.layoutParams as ViewGroup.MarginLayoutParams
-        //params.topMargin = (200 * resources.displayMetrics.density).toInt()
-        //mapView.layoutParams = params
+        val paramsLayoutControl = layoutControl.layoutParams as ViewGroup.MarginLayoutParams
+        paramsLayoutControl.topMargin = (80 * resources.displayMetrics.density).toInt()
+        layoutControl.layoutParams = paramsLayoutControl
+
+        val paramsLayoutConnexion = layoutConnexion.layoutParams as ViewGroup.MarginLayoutParams
+        paramsLayoutConnexion.topMargin = (80 * resources.displayMetrics.density).toInt()
+        layoutConnexion.layoutParams = paramsLayoutConnexion
 
         btnFinishNavigation.visibility = View.GONE
         layoutNavigationInput.visibility = View.VISIBLE

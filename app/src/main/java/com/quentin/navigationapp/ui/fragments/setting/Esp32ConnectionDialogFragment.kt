@@ -14,6 +14,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -22,6 +23,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.annotation.RequiresPermission
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
@@ -52,6 +54,7 @@ class Esp32ConnectionDialogFragment : DialogFragment() {
         return inflater.inflate(R.layout.dialog_device_connect, container, false)
     }
 
+    @RequiresApi(Build.VERSION_CODES.S)
     @SuppressLint("MissingPermission")
     @RequiresPermission(anyOf = [Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.BLUETOOTH_CONNECT])
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -63,9 +66,7 @@ class Esp32ConnectionDialogFragment : DialogFragment() {
             stopScan()
             targetDevice = device
             registerPairingReceiver()
-            Log.d("BleClick", "Start bonding to ${device.name}")
             device.createBond()
-            Toast.makeText(requireContext(), "Pairing with ${device.name}...", Toast.LENGTH_SHORT).show()
         }
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = adapter
@@ -91,21 +92,6 @@ class Esp32ConnectionDialogFragment : DialogFragment() {
             @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
             override fun onReceive(context: Context, intent: Intent) {
                 when (intent.action) {
-                    BluetoothDevice.ACTION_PAIRING_REQUEST -> {
-                        val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
-                        val variant = intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, BluetoothDevice.ERROR)
-                        if (device == targetDevice && variant == BluetoothDevice.PAIRING_VARIANT_PIN) {
-                            val pin = getPinFromUser(device)
-                            try {
-                                device?.setPin(pin.toByteArray())
-                                device?.setPairingConfirmation(true)
-                                abortBroadcast()
-                                Log.d("BLEPair", "PIN set for ${device?.name}")
-                            } catch (e: Exception) {
-                                Toast.makeText(requireContext(), "Erreur PIN: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
                     BluetoothDevice.ACTION_BOND_STATE_CHANGED -> {
                         val device: BluetoothDevice? = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
                         val bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, BluetoothDevice.BOND_NONE)
@@ -130,20 +116,6 @@ class Esp32ConnectionDialogFragment : DialogFragment() {
             priority = IntentFilter.SYSTEM_HIGH_PRIORITY
         }
         requireContext().registerReceiver(pairingReceiver, filter)
-    }
-
-    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    private fun getPinFromUser(device: BluetoothDevice?): String {
-        var pinString = "0000"
-        val edt = EditText(requireContext()).apply { hint = "PIN BLE" }
-        val dialog = AlertDialog.Builder(requireContext())
-            .setTitle("PIN pour ${device?.name}")
-            .setView(edt)
-            .setCancelable(false)
-            .setPositiveButton("OK") { _, _ -> pinString = edt.text.toString() }
-            .create()
-        dialog.show()
-        return pinString
     }
 
     @SuppressLint("MissingPermission")
@@ -196,6 +168,7 @@ class Esp32ConnectionDialogFragment : DialogFragment() {
         })
     }
 
+    @RequiresApi(Build.VERSION_CODES.S)
     private fun checkPermissions(): Boolean {
         val perms = listOf(
             Manifest.permission.BLUETOOTH_SCAN,
@@ -205,6 +178,7 @@ class Esp32ConnectionDialogFragment : DialogFragment() {
         return perms.all { ContextCompat.checkSelfPermission(requireContext(), it) == PackageManager.PERMISSION_GRANTED }
     }
 
+    @RequiresApi(Build.VERSION_CODES.S)
     private fun requestPermissions() {
         requestPermissions(
             arrayOf(
@@ -216,6 +190,7 @@ class Esp32ConnectionDialogFragment : DialogFragment() {
         )
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
@@ -246,7 +221,9 @@ class DevicesAdapter(
         fun bind(device: BluetoothDevice) {
             nameView.text = device.name ?: "Unknown"
             itemView.isClickable = true
-            itemView.setOnClickListener { onClick(device) }
+            itemView.setOnClickListener {
+                onClick(device)
+            }
         }
     }
 
