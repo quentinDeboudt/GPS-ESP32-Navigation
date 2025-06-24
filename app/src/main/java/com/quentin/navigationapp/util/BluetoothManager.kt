@@ -29,18 +29,19 @@ object BluetoothManager {
         val message: String = when (data) {
             is BleData.Direction -> "DIR:${data.code}"
             is BleData.DistanceBeforeDirection -> "DIST:${data.meters}"
-            is BleData.VectorPath -> "PATH:$data"
+            is BleData.VectorPath -> "PATH:${data.points}"
             is BleData.KilometersRemaining -> "KM:${data.km}"
             is BleData.TimeRemaining -> "TIME:${data.timeText}"
             is BleData.CurrentPosition -> "POSITION:${data}"
         }
 
+        Log.w("debugSendData", "Data: $message")
+
         if (characteristic != null && connected) {
            characteristic.value = message.toByteArray(Charsets.UTF_8)
            gatt?.writeCharacteristic(characteristic)
-            Log.d("BLESend", "Envoyé : $message")
         } else {
-            Log.w("BLESend", "Erreur : pas connecté ou caractéristique manquante")
+            Log.w("debugSendData", "Erreur : pas connecté ou caractéristique manquante")
         }
     }
 
@@ -53,8 +54,6 @@ object BluetoothManager {
             ?.getService(serviceUuid)
             ?.getCharacteristic(charUuid)
     }
-
-
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun close() {

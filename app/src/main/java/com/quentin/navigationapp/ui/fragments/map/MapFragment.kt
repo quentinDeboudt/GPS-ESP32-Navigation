@@ -338,10 +338,9 @@ class MapFragment : Fragment() {
                     locationFlow.collect { location ->
                         currentPosition = GeoPoint(location.latitude, location.longitude)
 
-
                         if (BluetoothManager.isConnected()) {
-                            Log.d("debugSendData", "Envoie de la Position Actuel")
-                            BluetoothManager.sendData(BleData.CurrentPosition(location.latitude, location.longitude))
+                            //Log.d("debugSendData", "Envoie de la Position Actuel")
+                            //BluetoothManager.sendData(BleData.CurrentPosition(location.latitude, location.longitude))
                         } else {
                             deviceIsConnected()
                         }
@@ -379,6 +378,8 @@ class MapFragment : Fragment() {
                 val lat = location.latitude
                 val lon = location.longitude
                 currentPosition = GeoPoint(lat, lon)
+                //Log.d("debugSendData", "Position actuelle")
+                //BluetoothManager.sendData(BleData.CurrentPosition(location.latitude, location.longitude))
                 configureMap(GeoPoint(lat, lon))
             } else {
                 Toast.makeText(requireContext(), "Impossible d’obtenir la localisation", Toast.LENGTH_SHORT).show()
@@ -482,10 +483,7 @@ class MapFragment : Fragment() {
                     val coords = ghResponse.points.coordinates
 
                     if (BluetoothManager.isConnected()) {
-
-                        Log.d("debugSendData", "VectorPath: ${coords}")
                         BluetoothManager.sendData(BleData.VectorPath(coords))
-
                     } else {
                         deviceIsConnected()
                     }
@@ -820,10 +818,9 @@ class MapFragment : Fragment() {
                 }
 
                 //TODO: display instruction on ESP-32
-                //tvInstruction.text = displayDist
-                //arrowImageView.setImageDrawable(
-                //    ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_straight_bk)
-                //)
+                BluetoothManager.sendData(BleData.Direction(0))
+                Log.d("debugSendData", "DistanceBeforeDirection: $displayDist")
+                BluetoothManager.sendData(BleData.DistanceBeforeDirection(displayDist))
             }
         }
     }
@@ -842,15 +839,15 @@ class MapFragment : Fragment() {
     /**
      * showInstruction
      * Displays the given instruction.
-     * @param instr The instruction to display.
+     * @param instr The instruction to display.KilometersRemaining
      */
     private fun showInstruction(instr: NavigationInstruction) {
 
         if (BluetoothManager.isConnected()) {
-            Log.d("debugSendData", "Direction: ${instr.arrow}")
-            Log.d("debugSendData", "DistanceBeforeDirection: ${instr.message.toInt()}")
-            BluetoothManager.sendData(BleData.Direction(instr.arrow))
-            BluetoothManager.sendData(BleData.DistanceBeforeDirection(50))
+            Log.d("debugSendData", "Direction avec fleche: ${instr.arrow}")
+            Log.d("debugSendData", "DistanceBeforeDirection: 50 m")
+            BluetoothManager.sendData(BleData.Direction(instr.arrow.toInt()))
+            BluetoothManager.sendData(BleData.DistanceBeforeDirection("50"))
         } else {
             deviceIsConnected()
         }
@@ -1022,17 +1019,6 @@ class MapFragment : Fragment() {
             onGranted()
         }
     }
-
-
-    fun deu(){
-        //BluetoothManager.sendData(BleData.Direction(0))
-        //BluetoothManager.sendData(BleData.DistanceBeforeDirection(120))
-        //BluetoothManager.sendData(BleData.KilometersRemaining(3.5))
-        //BluetoothManager.sendData(BleData.TimeRemaining("00:08:45"))
-        //val vectorPoints = listOf(48.85 to 2.35, 48.86 to 2.36)
-        //BluetoothManager.sendData(BleData.VectorPath(vectorPoints))
-    }
-
 }
 
 
