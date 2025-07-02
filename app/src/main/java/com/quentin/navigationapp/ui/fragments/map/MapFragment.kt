@@ -87,6 +87,10 @@ class MapFragment : Fragment() {
     private var lastDisplayedInstructionIndex: Int = -1
     private var lastCenter: GeoPoint? = null
     private var speedSegments: List<SpeedSegment> = emptyList()
+    private var lastDirection: Int? = null
+    private var lastDistanceBeforeDirection: Double? = null
+    private var lastKmRemaining: Int? = null
+    private var lastMinRemaining: Int? = null
 
     private lateinit var currentPosition: GeoPoint
     private lateinit var currentDestination: GeoPoint
@@ -99,6 +103,7 @@ class MapFragment : Fragment() {
     private var traveledPathPolyline: Polyline? = null
     private var isNavigating = false
     private var currentRoutePolyline: Polyline? = null
+    private var currentBorderPolyline: Polyline? = null
     private var currentProfile: Profile? = null
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 
@@ -358,6 +363,7 @@ class MapFragment : Fragment() {
 
                         if (maxSpeed != null && maxSpeed != lastMaxSpeed) {
                             lastMaxSpeed = maxSpeed
+                            delay(1000)
                             BluetoothManager.sendData(BleData.SpeedLimit(maxSpeed))
                         }
 
@@ -409,6 +415,9 @@ class MapFragment : Fragment() {
     }
 
 
+
+
+
     /**
      * getCurrentPosition
      * Retrieves the current GPS position.
@@ -435,11 +444,16 @@ class MapFragment : Fragment() {
      */
     private fun deviceIsConnected() {
         if (BluetoothManager.isConnected()) {
-            iconDevice.setImageResource(com.quentin.navigationapp.R.drawable.icon_device_connected)
-            tvConnectDevice.text = "Connecté"
+            requireActivity().runOnUiThread {
+                iconDevice.setImageResource(com.quentin.navigationapp.R.drawable.icon_device_connected)
+                tvConnectDevice.text = "Connecté"
+            }
+
         } else {
-            iconDevice.setImageResource(com.quentin.navigationapp.R.drawable.icon_device_disconnected)
-            tvConnectDevice.text = "Déconnecté"
+            requireActivity().runOnUiThread {
+                iconDevice.setImageResource(com.quentin.navigationapp.R.drawable.icon_device_disconnected)
+                tvConnectDevice.text = "Déconnecté"
+            }
         }
     }
 
@@ -591,6 +605,10 @@ class MapFragment : Fragment() {
             mapView.overlays.remove(old)
             mapView.invalidate()
         }
+        currentBorderPolyline?.let { old ->
+            mapView.overlays.remove(old)
+            mapView.invalidate()
+        }
 
         // Create and add new path on the MapView
         val newPolyline = Polyline().apply {
@@ -606,6 +624,7 @@ class MapFragment : Fragment() {
         mapView.overlays.add(borderPolyline)
         mapView.overlays.add(newPolyline)
         currentRoutePolyline = newPolyline
+        currentBorderPolyline = borderPolyline
 
         if (!isNavigating) {
             val bbox = BoundingBox.fromGeoPointsSafe(routePoints)
@@ -621,8 +640,6 @@ class MapFragment : Fragment() {
         updateRemainingNavigation(
             originalDistanceMeters = totalKilometers,
             originalTime = totalMinutes,
-            tvDistance = navigationDistance,
-            tvTime = navigationTime
         )
     }
 
@@ -637,30 +654,6 @@ class MapFragment : Fragment() {
             currentDestination.longitude
         )
         getDirections(destLatLng)
-    }
-
-    /**
-     * getArrowForInstruction
-     * Gets the arrow icon for the given instruction.
-     * @param sign The instruction sign.
-     * @return The arrow icon.
-     */
-    private fun getArrowForInstruction(sign: Int?): Drawable? {
-        return when (sign) {
-            //Tout droit
-            0 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_straight_bk)
-            //left
-            -3, -2 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_left_2_bk)
-            -1 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_left_1_bk)
-            //right
-            3, 2 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_right_2_bk)
-            1 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_right_1_bk)
-            //Sail on the left (keep the left lane)
-            7 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_left_1_bk)
-            //Sail on the right (keep the right lane)
-            8 -> ContextCompat.getDrawable(requireContext(), com.quentin.navigationapp.R.drawable.nav_right_1_bk)
-            else -> null
-        }
     }
 
     /**
@@ -741,7 +734,7 @@ class MapFragment : Fragment() {
      * @calls animateMapTo
      * @calls checkInstructionTrigger
      */
-    private fun updateArrowOverlay(position: Location) {
+    private suspend fun updateArrowOverlay(position: Location) {
 
         val currentGeo = GeoPoint(position.latitude, position.longitude)
         val bearing: Float = position.bearing
@@ -812,7 +805,7 @@ class MapFragment : Fragment() {
      * @calls showInstruction
      * @calls normalizeBearingDiff
      */
-    private fun checkInstructionTrigger(currentLocation: GeoPoint, deviceHeading: Float) {
+    private suspend fun checkInstructionTrigger(currentLocation: GeoPoint, deviceHeading: Float) {
         if (instructions.isEmpty()) return
 
         val announceDistance = 80.0 //Announced distance in meters
@@ -834,6 +827,7 @@ class MapFragment : Fragment() {
         if (upcoming.isEmpty()) {
             if (BluetoothManager.isConnected()) {
                 BluetoothManager.sendData(BleData.Direction(0))
+                lastDirection = 0
             } else {
                 deviceIsConnected()
             }
@@ -859,10 +853,124 @@ class MapFragment : Fragment() {
                 }
             }
             else -> {
-                //TODO: display instruction on ESP-32
-                BluetoothManager.sendData(BleData.Direction(0))
-                BluetoothManager.sendData(BleData.DistanceBeforeDirection(distance.toInt()))
+                if (0 != lastDirection) {
+                    BluetoothManager.sendData(BleData.Direction(0))
+                    lastDirection = 0
+                }
+                delay(500)
+                if (distance != lastDistanceBeforeDirection) {
+                    BluetoothManager.sendData(BleData.DistanceBeforeDirection(distance.toString()))
+
+                    lastDistanceBeforeDirection = distance
+
+                    timeAndDistanceRemaining()
+                }
             }
+        }
+    }
+
+    suspend fun timeAndDistanceRemaining() {
+
+        val routeLatLng = routePoints.map { LatLng(it.latitude, it.longitude) }
+        val distanceTraveledMeters = calculateDistanceTraveled(
+            LatLng(currentPosition.latitude, currentPosition.longitude),
+            routeLatLng
+        )
+
+        val totalDistanceMeters = totalKilometers * 1000 // Convertir en mètres
+
+        val distanceRemainingMeters = totalDistanceMeters - distanceTraveledMeters
+        val totalTimeMillis = totalMinutes * 60 * 1000L // Convertir minutes en millisecondes
+
+        val timeTraveledMillis = if (totalDistanceMeters > 0)
+            (distanceTraveledMeters / totalDistanceMeters) * totalTimeMillis
+        else 0.0
+
+        val timeRemainingMillis = totalTimeMillis - timeTraveledMillis
+
+        val minutesRemaining = (timeRemainingMillis / 1000 / 60).toInt()
+        val kilometersRemaining = (distanceRemainingMeters / 1000).toInt()
+
+        updateRemainingNavigation(kilometersRemaining.toDouble(), minutesRemaining.toLong())
+    }
+
+    fun calculateDistanceTraveled(currentPosition: LatLng, routePoints: List<LatLng>): Double {
+        if (routePoints.isEmpty()) return 0.0
+
+        // Étape 1 : trouver le point du tracé le plus proche de la position actuelle
+        var closestIndex = 0
+        var minDistance = Double.MAX_VALUE
+        for ((index, point) in routePoints.withIndex()) {
+            val dist = haversine(currentPosition.latitude, currentPosition.longitude, point.latitude, point.longitude)
+            if (dist < minDistance) {
+                minDistance = dist
+                closestIndex = index
+            }
+        }
+
+        // Étape 2 : sommer toutes les distances du début du tracé jusqu'à ce point
+        var distanceTraveled = 0.0
+        for (i in 0 until closestIndex) {
+            val from = routePoints[i]
+            val to = routePoints[i + 1]
+            distanceTraveled += haversine(from.latitude, from.longitude, to.latitude, to.longitude)
+        }
+
+        return distanceTraveled // En mètres
+    }
+
+    fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val R = 6371000.0 // Rayon de la Terre en mètres
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = sin(dLat / 2).pow(2.0) +
+                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+                sin(dLon / 2).pow(2.0)
+        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+        return R * c
+    }
+
+    /**
+     * updateRemainingNavigation
+     * Updates the remaining navigation.
+     * @param originalDistanceMeters The original distance in meters.
+     * @param originalTime The original time in milliseconds.
+     */
+    private suspend fun updateRemainingNavigation(
+        originalDistanceMeters: Double,
+        originalTime: Long,
+    ) {
+        val time = originalTime
+        // Time:
+        val hours = originalTime / 60
+        val minutes = originalTime % 60
+
+        val timeFormatted = when {
+            hours > 0 -> "$hours h $minutes min"
+            minutes > 0 -> "$minutes min"
+            else -> "<1 min"
+        }
+
+        //Distance:
+        val originalDistanceMeters = String.format("%.0f", originalDistanceMeters).toString()
+
+        if (lastKmRemaining != originalDistanceMeters.toInt()) {
+            lastKmRemaining = originalDistanceMeters.toInt()
+            requireActivity().runOnUiThread {
+                navigationDistance.text = "${originalDistanceMeters} km"
+            }
+            delay(500)
+            BluetoothManager.sendData(BleData.KilometersRemaining(originalDistanceMeters.toInt()))
+        }
+
+        if (lastMinRemaining != time.toInt()) {
+            lastMinRemaining = time.toInt()
+
+            requireActivity().runOnUiThread {
+                navigationTime.text = timeFormatted.toString()
+            }
+            delay(1000)
+            BluetoothManager.sendData(BleData.TimeRemaining(time.toInt()))
         }
     }
 
@@ -885,7 +993,10 @@ class MapFragment : Fragment() {
     private fun showInstruction(instr: NavigationInstruction) {
 
         if (BluetoothManager.isConnected()) {
-            BluetoothManager.sendData(BleData.Direction(instr.arrow.toInt()))
+            if (instr.arrow.toInt() != lastDirection) {
+                BluetoothManager.sendData(BleData.Direction(instr.arrow.toInt()))
+                lastDirection = instr.arrow.toInt()
+            }
         } else {
             Log.d("debugSendData", "/!| Device Is Not Connected")
             deviceIsConnected()
@@ -947,45 +1058,6 @@ class MapFragment : Fragment() {
             distanceToSegment(current, start, end)
         } ?: Double.MAX_VALUE
         return minDist > maxDistanceMeters
-    }
-
-    /**
-     * updateRemainingNavigation
-     * Updates the remaining navigation.
-     * @param originalDistanceMeters The original distance in meters.
-     * @param originalTime The original time in milliseconds.
-     * @param tvDistance The distance text view.
-     * @param tvTime The time text view.
-     */
-    private suspend fun updateRemainingNavigation(
-        originalDistanceMeters: Double,
-        originalTime: Long,
-        tvDistance: TextView,
-        tvTime: TextView
-    ) {
-        val time = originalTime
-        // Time:
-        val hours = originalTime / 60
-        val minutes = originalTime % 60
-
-        val timeFormatted = when {
-            hours > 0 -> "$hours h $minutes min"
-            minutes > 0 -> "$minutes min"
-            else -> "<1 min"
-        }
-
-        //Distance:
-        val originalDistanceMeters = String.format("%.0f", originalDistanceMeters).toString()
-        val distance = "$originalDistanceMeters km"
-
-        requireActivity().runOnUiThread {
-            tvDistance.text = distance
-            tvTime.text = timeFormatted
-        }
-
-        BluetoothManager.sendData(BleData.KilometersRemaining(originalDistanceMeters.toInt()))
-        delay(1000L)
-        BluetoothManager.sendData(BleData.TimeRemaining(time.toInt()))
     }
 
     /**
