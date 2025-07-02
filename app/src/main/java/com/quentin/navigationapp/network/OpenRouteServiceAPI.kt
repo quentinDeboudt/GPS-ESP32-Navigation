@@ -15,6 +15,7 @@ interface OpenRouteServiceAPI {
         @Query("instructions") instructions: Boolean = true,
         @Query("calc_points") calcPoints: Boolean = true,
         @Query("points_encoded") pointsEncoded: Boolean = false,
+        @Query("details") details: List<String> = listOf("max_speed"),
         @Query("key") apiKey: String
     ): GraphHopperResponse
 }

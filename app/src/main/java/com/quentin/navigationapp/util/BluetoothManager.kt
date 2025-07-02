@@ -31,11 +31,12 @@ object BluetoothManager {
             is BleData.DistanceBeforeDirection -> "DIST:${data.meters}"
             is BleData.VectorPath -> "PATH:${data.points}"
             is BleData.KilometersRemaining -> "KM:${data.km}"
-            is BleData.TimeRemaining -> "TIME:${data.timeText}"
+            is BleData.TimeRemaining -> "TIME:${data.time}"
             is BleData.CurrentPosition -> "POSITION:${data}"
+            is BleData.SpeedLimit -> "SPEEDLIMIT:${data.speed}"
         }
 
-        Log.w("debugSendData", "Data: $message")
+        Log.w("debugSendData", "ESP32: $message")
 
         if (characteristic != null && connected) {
            characteristic.value = message.toByteArray(Charsets.UTF_8)

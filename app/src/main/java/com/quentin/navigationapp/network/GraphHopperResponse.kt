@@ -1,14 +1,18 @@
 package com.quentin.navigationapp.network
 
+import android.R
+
 data class GraphHopperResponse(
     val paths: List<Path>
 )
+data class SpeedSegment(val fromIndex: Int, val toIndex: Int, val speed: Int?)
 
 data class Path(
     val distance: Double,
     val time: Long,
     val points: Points,
-    val instructions: List<Instruction>
+    val instructions: List<Instruction>,
+    val details: Map<String, List<List<Any>>>
 )
 
 data class Points(

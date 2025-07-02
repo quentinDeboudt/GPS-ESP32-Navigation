@@ -20,7 +20,7 @@ class NavigationService {
         val point1 = "${start.latitude}, ${start.longitude}"
         val point2 = "${end.latitude}, ${end.longitude}"
 
-        return apiGraphhopper.getRoute(point1, point2, vehicle, "fr", weighting,true, true, false, BuildConfig.GH_API_KEY)
+        return apiGraphhopper.getRoute(point1, point2, vehicle, "fr", weighting,true, true, false, listOf("max_speed"), BuildConfig.GH_API_KEY)
     }
 }
 

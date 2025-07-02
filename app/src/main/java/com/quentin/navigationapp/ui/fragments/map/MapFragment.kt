@@ -35,6 +35,7 @@ import com.quentin.navigationapp.model.NavigationInstruction
 import com.quentin.navigationapp.model.Profile
 import com.quentin.navigationapp.model.VehicleSubType
 import com.quentin.navigationapp.network.Path
+import com.quentin.navigationapp.network.SpeedSegment
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -85,6 +86,7 @@ class MapFragment : Fragment() {
     private var lastPosition: Location? = null
     private var lastDisplayedInstructionIndex: Int = -1
     private var lastCenter: GeoPoint? = null
+    private var speedSegments: List<SpeedSegment> = emptyList()
 
     private lateinit var currentPosition: GeoPoint
     private lateinit var currentDestination: GeoPoint
@@ -331,8 +333,7 @@ class MapFragment : Fragment() {
                 showLoadingDialog()
                 navigationStartView()
                 navigationisStarted(true)
-                Log.d("debugSendData", "Start navigation: ")
-
+                var lastMaxSpeed: Int? = null
 
                 navigationJob = lifecycleScope.launch {
                     locationFlow.collect { location ->
@@ -351,6 +352,15 @@ class MapFragment : Fragment() {
                             routeRecalculation()
                         }
 
+                        val maxSpeed = getClosestPointWithSpeed(
+                            LatLng(currentPosition.latitude,currentPosition.longitude),
+                            routePoints).speed
+
+                        if (maxSpeed != null && maxSpeed != lastMaxSpeed) {
+                            lastMaxSpeed = maxSpeed
+                            BluetoothManager.sendData(BleData.SpeedLimit(maxSpeed))
+                        }
+
                     }
                 }
             }
@@ -366,6 +376,38 @@ class MapFragment : Fragment() {
             navigationStopView()
         }
     }
+
+
+    data class ClosestPointResult(
+        val index: Int,
+        val point: GeoPoint,
+        val speed: Int?
+    )
+
+    fun getClosestPointWithSpeed(
+        currentPosition: LatLng,
+        geoPoints: List<GeoPoint>,
+    ): ClosestPointResult {
+        fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+            val R = 6371000.0
+            val dLat = Math.toRadians(lat2 - lat1)
+            val dLon = Math.toRadians(lon2 - lon1)
+            val a = sin(dLat / 2).pow(2) +
+                    cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+                    sin(dLon / 2).pow(2)
+            return 2 * R * asin(sqrt(a))
+        }
+
+        val index = geoPoints.indices.minByOrNull { i ->
+            val pt = geoPoints[i]
+            haversine(currentPosition.latitude, currentPosition.longitude, pt.latitude, pt.longitude)
+        } ?: 0
+
+        val speed = speedSegments.firstOrNull { index in it.fromIndex until it.toIndex }?.speed
+
+        return ClosestPointResult(index, geoPoints[index], speed)
+    }
+
 
     /**
      * getCurrentPosition
@@ -483,7 +525,7 @@ class MapFragment : Fragment() {
                     val coords = ghResponse.points.coordinates
 
                     if (BluetoothManager.isConnected()) {
-                        BluetoothManager.sendData(BleData.VectorPath(coords))
+                        //BluetoothManager.sendData(BleData.VectorPath(coords))
                     } else {
                         deviceIsConnected()
                     }
@@ -495,6 +537,13 @@ class MapFragment : Fragment() {
                     //distance in meters
                     val distanceInMeters = ghResponse.distance
                     totalKilometers = distanceInMeters / 1000
+
+                    speedSegments = ghResponse.details["max_speed"]?.mapNotNull { segment ->
+                        val from = (segment.getOrNull(0) as? Number)?.toInt()
+                        val to = (segment.getOrNull(1) as? Number)?.toInt()
+                        val speed = (segment.getOrNull(2) as? Number)?.toInt() // null possible si la vitesse est inconnue
+                        if (from != null && to != null) SpeedSegment(from, to, speed) else null
+                    } ?: emptyList()
 
                     val geoPointsList: List<GeoPoint> = coords.map { (lon, lat) ->
                         GeoPoint(lat, lon)
@@ -534,7 +583,7 @@ class MapFragment : Fragment() {
      * Displays the vector path on the map.
      * @param coordinates The list of GPS coordinates.
      */
-    private fun displayVectorPath(coordinates: List<GeoPoint>) {
+    private suspend fun displayVectorPath(coordinates: List<GeoPoint>) {
         routePoints = coordinates.map { GeoPoint(it.latitude, it.longitude) }
 
         // Delete old vector track
@@ -784,7 +833,6 @@ class MapFragment : Fragment() {
         //Second step: Show the instruction
         if (upcoming.isEmpty()) {
             if (BluetoothManager.isConnected()) {
-                Log.d("debugSendData", "DIRECTION: 0")
                 BluetoothManager.sendData(BleData.Direction(0))
             } else {
                 deviceIsConnected()
@@ -811,16 +859,9 @@ class MapFragment : Fragment() {
                 }
             }
             else -> {
-                val displayDist = if (distance >= 1000.0) {
-                    String.format("%.1f km", distance / 1000.0)
-                } else {
-                    String.format("%.0f m", distance)
-                }
-
                 //TODO: display instruction on ESP-32
                 BluetoothManager.sendData(BleData.Direction(0))
-                Log.d("debugSendData", "DistanceBeforeDirection: $displayDist")
-                BluetoothManager.sendData(BleData.DistanceBeforeDirection(displayDist))
+                BluetoothManager.sendData(BleData.DistanceBeforeDirection(distance.toInt()))
             }
         }
     }
@@ -844,11 +885,9 @@ class MapFragment : Fragment() {
     private fun showInstruction(instr: NavigationInstruction) {
 
         if (BluetoothManager.isConnected()) {
-            Log.d("debugSendData", "Direction avec fleche: ${instr.arrow}")
-            Log.d("debugSendData", "DistanceBeforeDirection: 50 m")
             BluetoothManager.sendData(BleData.Direction(instr.arrow.toInt()))
-            BluetoothManager.sendData(BleData.DistanceBeforeDirection("50"))
         } else {
+            Log.d("debugSendData", "/!| Device Is Not Connected")
             deviceIsConnected()
         }
 
@@ -918,12 +957,13 @@ class MapFragment : Fragment() {
      * @param tvDistance The distance text view.
      * @param tvTime The time text view.
      */
-    private fun updateRemainingNavigation(
+    private suspend fun updateRemainingNavigation(
         originalDistanceMeters: Double,
         originalTime: Long,
         tvDistance: TextView,
         tvTime: TextView
     ) {
+        val time = originalTime
         // Time:
         val hours = originalTime / 60
         val minutes = originalTime % 60
@@ -942,6 +982,10 @@ class MapFragment : Fragment() {
             tvDistance.text = distance
             tvTime.text = timeFormatted
         }
+
+        BluetoothManager.sendData(BleData.KilometersRemaining(originalDistanceMeters.toInt()))
+        delay(1000L)
+        BluetoothManager.sendData(BleData.TimeRemaining(time.toInt()))
     }
 
     /**
