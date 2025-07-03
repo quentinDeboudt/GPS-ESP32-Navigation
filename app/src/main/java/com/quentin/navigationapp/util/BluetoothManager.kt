@@ -36,13 +36,13 @@ object BluetoothManager {
             is BleData.SpeedLimit -> "SPEEDLIMIT:${data.speed}"
         }
 
-        Log.w("debugSendData", "ESP32: $message")
+        //Log.w("debugSendData", "ESP32: $message")
 
         if (characteristic != null && connected) {
            characteristic.value = message.toByteArray(Charsets.UTF_8)
            gatt?.writeCharacteristic(characteristic)
         } else {
-            Log.w("debugSendData", "Erreur : pas connecté ou caractéristique manquante")
+            //Log.w("debugSendData", "Erreur : pas connecté ou caractéristique manquante")
         }
     }
 

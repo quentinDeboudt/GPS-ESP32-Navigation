@@ -6,7 +6,6 @@ import android.app.AlertDialog
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.graphics.drawable.Drawable
 import android.hardware.SensorManager
 import android.location.Address
 import android.location.Geocoder
@@ -29,6 +28,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.model.LatLng
+import com.google.gson.Gson
 import com.quentin.navigationapp.data.NavigationService
 import com.quentin.navigationapp.model.BleData
 import com.quentin.navigationapp.model.NavigationInstruction
@@ -54,6 +54,9 @@ import org.osmdroid.views.overlay.Polyline
 import kotlin.math.*
 import com.quentin.navigationapp.util.BluetoothManager
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import org.openjdk.tools.javac.util.Position
+import org.osmdroid.api.IGeoPoint
 
 class MapFragment : Fragment() {
 
@@ -91,6 +94,14 @@ class MapFragment : Fragment() {
     private var lastDistanceBeforeDirection: Double? = null
     private var lastKmRemaining: Int? = null
     private var lastMinRemaining: Int? = null
+    private var simplifiedPath: List<GeoPoint> = listOf(
+        GeoPoint(0.0, 0.0),
+        GeoPoint(0.0, 0.0)
+    )
+    private lateinit var lastSimplifiedPath: List<GeoPoint>
+    private var lastSentIndex: Int = 0
+    private val chunkSize = 20
+    private var firstChunkSent = false
 
     private lateinit var currentPosition: GeoPoint
     private lateinit var currentDestination: GeoPoint
@@ -344,13 +355,6 @@ class MapFragment : Fragment() {
                     locationFlow.collect { location ->
                         currentPosition = GeoPoint(location.latitude, location.longitude)
 
-                        if (BluetoothManager.isConnected()) {
-                            //Log.d("debugSendData", "Envoie de la Position Actuel")
-                            //BluetoothManager.sendData(BleData.CurrentPosition(location.latitude, location.longitude))
-                        } else {
-                            deviceIsConnected()
-                        }
-
                         updateArrowOverlay(location)
 
                         if (isFarFromRoute(currentPosition, routePoints)) {
@@ -361,12 +365,32 @@ class MapFragment : Fragment() {
                             LatLng(currentPosition.latitude,currentPosition.longitude),
                             routePoints).speed
 
-                        if (maxSpeed != null && maxSpeed != lastMaxSpeed) {
-                            lastMaxSpeed = maxSpeed
-                            delay(1000)
-                            BluetoothManager.sendData(BleData.SpeedLimit(maxSpeed))
-                        }
+                        Log.d("debugSendData", "Verification du VectorPath...")
+                        handleCurrentPositionAndPathUpdate()
 
+                        if (BluetoothManager.isConnected()) {
+                            if (maxSpeed != null && maxSpeed != lastMaxSpeed) {
+                                lastMaxSpeed = maxSpeed
+                                delay(1000)
+                                BluetoothManager.sendData(BleData.SpeedLimit(maxSpeed))
+                            }
+
+                            val lastLoc = lastPosition?: GeoPoint(0.0, 0.0).toLocation()
+                            val currentLoc = currentPosition.toLocation()
+
+                            val distance = lastLoc.distanceTo(currentLoc)
+
+                            if (distance >= 5f) { // Seuil : 5 mètres
+                                lastPosition = currentPosition.toLocation()
+                                BluetoothManager.sendData(BleData.CurrentPosition(currentLoc.latitude, currentLoc.longitude))
+
+                                //handleCurrentPositionAndPathUpdate()
+                            }
+
+                        } else {
+
+                            deviceIsConnected()
+                        }
                     }
                 }
             }
@@ -383,6 +407,87 @@ class MapFragment : Fragment() {
         }
     }
 
+    var currentChunk: List<List<Double>> = emptyList()
+
+    fun handleCurrentPositionAndPathUpdate() {
+        val thresholdMeters = 30.0
+        val nearEndThreshold = 5.0
+        var closestIndex = -1
+        var minDistance = Double.MAX_VALUE
+
+        // Trouver le point le plus proche dans le chemin complet
+        simplifiedPath.forEachIndexed { index, point ->
+            val loc = Location("").apply {
+                latitude = point.latitude
+                longitude = point.longitude
+            }
+            val currentLoc = Location("").apply {
+                latitude = currentPosition.latitude
+                longitude = currentPosition.longitude
+            }
+            val dist = currentLoc.distanceTo(loc)
+            if (dist < minDistance) {
+                minDistance = dist.toDouble()
+                closestIndex = index
+            }
+        }
+
+        // Si c’est la première fois, on envoie le premier chunk
+        if (!firstChunkSent) {
+            currentChunk = getNextChunkFromFullPath()
+
+            val currentChunkJson = JSONObject().apply {
+                JSONArray().apply {
+                    currentChunk.forEach { point ->
+                        put(JSONArray(listOf(point[0], point[1])))
+                    }
+                }
+            }
+            BluetoothManager.sendData(BleData.VectorPath(currentChunkJson))
+            firstChunkSent = true
+        }
+
+        if (minDistance < thresholdMeters && currentChunk.isNotEmpty()) {
+            val currentLoc = Location("").apply {
+                latitude = currentPosition.latitude
+                longitude = currentPosition.longitude
+            }
+            val chunkEndPoint = currentChunk.last()
+            val chunkEndLoc = Location("").apply {
+                latitude = chunkEndPoint[0]
+                longitude = chunkEndPoint[1]
+            }
+            val distanceToChunkEnd = currentLoc.distanceTo(chunkEndLoc)
+
+            if (distanceToChunkEnd <= nearEndThreshold) {
+                // Envoie le chunk suivant seulement ici
+                currentChunk = getNextChunkFromFullPath()
+                if (currentChunk.isNotEmpty()) {
+                    val currentChunkJson = JSONObject().apply {
+                        JSONArray().apply {
+                            currentChunk.forEach { point ->
+                                put(JSONArray(listOf(point[0], point[1])))
+                            }
+                        }
+                    }
+
+                    BluetoothManager.sendData(BleData.VectorPath(currentChunkJson))
+                } else {
+                    Log.d("debugSendData", "Plus de chunk à envoyer, fin du chemin atteinte.")
+                }
+            }
+        }
+    }
+
+    fun getNextChunkFromFullPath(): List<List<Double>> {
+        if (lastSentIndex >= routePoints.size) {
+            return emptyList()
+        }
+        val endIndex = (lastSentIndex + chunkSize).coerceAtMost(routePoints.size)
+        val chunk = routePoints.subList(lastSentIndex, endIndex)
+        lastSentIndex = endIndex
+        return chunk.map { listOf(it.latitude, it.longitude) }
+    }
 
     data class ClosestPointResult(
         val index: Int,
@@ -429,8 +534,6 @@ class MapFragment : Fragment() {
                 val lat = location.latitude
                 val lon = location.longitude
                 currentPosition = GeoPoint(lat, lon)
-                //Log.d("debugSendData", "Position actuelle")
-                //BluetoothManager.sendData(BleData.CurrentPosition(location.latitude, location.longitude))
                 configureMap(GeoPoint(lat, lon))
             } else {
                 Toast.makeText(requireContext(), "Impossible d’obtenir la localisation", Toast.LENGTH_SHORT).show()
@@ -562,6 +665,9 @@ class MapFragment : Fragment() {
                     val geoPointsList: List<GeoPoint> = coords.map { (lon, lat) ->
                         GeoPoint(lat, lon)
                     }
+
+                    simplifiedPath = geoPointsList.filterIndexed { index, _ -> index % 2 == 0 }
+                    lastSimplifiedPath = simplifiedPath
 
                     ghResponse.instructions.forEach { instr ->
                         val (startIdx, endIdx) = instr.interval
@@ -826,8 +932,10 @@ class MapFragment : Fragment() {
         //Second step: Show the instruction
         if (upcoming.isEmpty()) {
             if (BluetoothManager.isConnected()) {
-                BluetoothManager.sendData(BleData.Direction(0))
-                lastDirection = 0
+                if (0 != lastDirection) {
+                    BluetoothManager.sendData(BleData.Direction(0))
+                    lastDirection = 0
+                }
             } else {
                 deviceIsConnected()
             }
@@ -853,13 +961,13 @@ class MapFragment : Fragment() {
                 }
             }
             else -> {
-                if (0 != lastDirection) {
+                if (lastDirection != 0) {
                     BluetoothManager.sendData(BleData.Direction(0))
                     lastDirection = 0
                 }
                 delay(500)
-                if (distance != lastDistanceBeforeDirection) {
-                    BluetoothManager.sendData(BleData.DistanceBeforeDirection(distance.toString()))
+                if (distance.toInt() != lastDistanceBeforeDirection?.toInt()) {
+                    BluetoothManager.sendData(BleData.DistanceBeforeDirection(distance.toInt().toString()))
 
                     lastDistanceBeforeDirection = distance
 
@@ -959,8 +1067,13 @@ class MapFragment : Fragment() {
             requireActivity().runOnUiThread {
                 navigationDistance.text = "${originalDistanceMeters} km"
             }
-            delay(500)
-            BluetoothManager.sendData(BleData.KilometersRemaining(originalDistanceMeters.toInt()))
+
+            if (BluetoothManager.isConnected()) {
+                Log.d("debugSendData", "DistanceMetersBeforeInstruction = $originalDistanceMeters")
+                BluetoothManager.sendData(BleData.KilometersRemaining(originalDistanceMeters.toInt()))
+            } else {
+                deviceIsConnected()
+            }
         }
 
         if (lastMinRemaining != time.toInt()) {
@@ -969,8 +1082,15 @@ class MapFragment : Fragment() {
             requireActivity().runOnUiThread {
                 navigationTime.text = timeFormatted.toString()
             }
-            delay(1000)
-            BluetoothManager.sendData(BleData.TimeRemaining(time.toInt()))
+
+            if (BluetoothManager.isConnected()) {
+                delay(500)
+                BluetoothManager.sendData(BleData.TimeRemaining(time.toInt()))
+            } else {
+
+                deviceIsConnected()
+            }
+
         }
     }
 
@@ -998,7 +1118,6 @@ class MapFragment : Fragment() {
                 lastDirection = instr.arrow.toInt()
             }
         } else {
-            Log.d("debugSendData", "/!| Device Is Not Connected")
             deviceIsConnected()
         }
 
